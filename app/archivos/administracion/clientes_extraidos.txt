@@ -1,0 +1,7 @@
+Cliente	Asunto	Fecha_Creacion	Prioridad
+109505	Ticket-WIRELESS	30-09-2025 22:22:19	medium
+202254	Ticket-WIRELESS	30-09-2025 16:39:06	medium
+108803	Ticket-FO	30-09-2025 13:06:19	medium
+204347	Ticket-WIRELESS	29-09-2025 19:00:56	medium
+202583	Ticket-FO	29-09-2025 13:42:15	medium
+107583	Ticket-FO	27-09-2025 11:25:07	medium

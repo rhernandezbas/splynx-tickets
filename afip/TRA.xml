@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<loginTicketRequest version="1.0">
+  <header>
+    <uniqueId>1759429160</uniqueId>
+    <generationTime>2025-10-02T15:14:20</generationTime>
+    <expirationTime>2025-10-02T15:24:20</expirationTime>
+  </header>
+  <service>wsmtxca</service>
+</loginTicketRequest>
