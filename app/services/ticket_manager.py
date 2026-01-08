@@ -31,7 +31,7 @@ class TicketManager:
         - ID 37: 8:00 AM - 3:00 PM
         - ID 10: 8:00 AM - 4:00 PM
         - ID 27: 10:00 AM - 5:20 PM
-        - ID 38: 5:00 PM - 11:50 PM
+        - ID 38: 5:00 PM - 11:00 PM
         
         Returns:
             int: ID de la persona asignada según el horario
@@ -48,9 +48,9 @@ class TicketManager:
         # Definir horarios en minutos desde medianoche
         # Turno nocturno: 12:00 AM (0) - 8:00 AM (480) -> IDs 10 y 37
         # ID 37: 8:00 AM (480) - 3:00 PM (900)
-        # ID 10: 8:00 AM (480) - 4:30 PM (990)
+        # ID 10: 8:00 AM (480) - 4:00 PM (960)
         # ID 27: 10:00 AM (600) - 5:20 PM (1040)
-        # ID 38: 5:00 PM (1020) - 11:50 PM (1430)
+        # ID 38: 5:00 PM (1020) - 11:00 PM (1380)
         
         available_persons = []
         
@@ -62,13 +62,13 @@ class TicketManager:
         if 480 <= current_time_minutes < 900:  # 8:00 AM - 3:00 PM
             available_persons.append(37)
         
-        if 480 <= current_time_minutes < 990:  # 8:00 AM - 4:30 PM
+        if 480 <= current_time_minutes < 960:  # 8:00 AM - 4:00 PM
             available_persons.append(10)
         
         if 600 <= current_time_minutes < 1040:  # 10:00 AM - 5:20 PM
             available_persons.append(27)
         
-        if 1020 <= current_time_minutes <= 1430:  # 5:00 PM - 11:50 PM
+        if 1020 <= current_time_minutes <= 1380:  # 5:00 PM - 11:00 PM
             available_persons.append(38)
         
         # Si no hay nadie disponible, usar fallback (round-robin entre todos)
