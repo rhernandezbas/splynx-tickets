@@ -5,14 +5,13 @@ Ejecuta el flujo completo de tickets cada 10 minutos
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-import threading
+import requests
 from datetime import datetime
 import pytz
 
 
 def run_all_flow_job(app):
-    """Ejecuta el flujo completo de tickets (download CSV + create tickets)"""
-    from app.routes.thread_functions import thread_download_csv, thread_create_tickets
+    """Ejecuta el flujo completo de tickets llamando al endpoint HTTP"""
     
     # Obtener hora actual en Argentina
     tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
@@ -23,22 +22,24 @@ def run_all_flow_job(app):
     print(f"{'='*60}")
     
     try:
-        # Primer paso: Descargar CSV
-        print("📥 Paso 1/2: Descargando CSV...")
-        hilo1 = threading.Thread(target=thread_download_csv)
-        hilo1.start()
-        hilo1.join()  # Esperar a que termine
-        print("✅ CSV descargado exitosamente")
+        # Llamar al endpoint all_flow
+        print("📡 Llamando al endpoint /api/tickets/all_flow...")
+        response = requests.post('http://localhost:7842/api/tickets/all_flow', timeout=300)
         
-        # Segundo paso: Crear tickets
-        print("🎫 Paso 2/2: Creando tickets...")
-        thread_create_tickets(app)
-        print("✅ Tickets creados exitosamente")
+        if response.status_code == 200:
+            print("✅ Endpoint ejecutado exitosamente")
+            print(f"📄 Respuesta: {response.json()}")
+        else:
+            print(f"⚠️ Endpoint respondió con código: {response.status_code}")
+            print(f"📄 Respuesta: {response.text}")
         
         print(f"{'='*60}")
         print(f"✅ CRON JOB COMPLETADO - {datetime.now(tz_argentina).strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*60}\n")
         
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error al llamar al endpoint: {str(e)}")
+        print(f"{'='*60}\n")
     except Exception as e:
         print(f"❌ Error en cron job: {str(e)}")
         print(f"{'='*60}\n")
@@ -65,5 +66,10 @@ def init_scheduler(app):
     print("📋 Tarea: Ejecutar all_flow cada 10 minutos")
     print("🌎 Zona horaria: America/Argentina/Buenos_Aires")
     print("="*60 + "\n")
+    
+    # Ejecutar inmediatamente al iniciar
+    print("🚀 Ejecutando flujo inicial al arrancar la aplicación...")
+    import threading
+    threading.Thread(target=lambda: run_all_flow_job(app)).start()
     
     return scheduler
