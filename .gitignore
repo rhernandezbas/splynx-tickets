@@ -10,6 +10,7 @@ build/
 *.egg
 pip-log.txt
 pip-delete-this-directory.txt
+.idea
 
 # Virtual environments
 venv/
