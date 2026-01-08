@@ -14,14 +14,41 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS
+      - name: Setup VPS and Deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: 190.7.234.37
           username: root
           password: YmUeXJYrO3
           port: 22
+          command_timeout: 30m
           script: |
+            echo "🔧 Verificando dependencias..."
+            
+            # Verificar Docker
+            if ! command -v docker &> /dev/null; then
+              echo "📦 Instalando Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+              rm get-docker.sh
+            else
+              echo "✅ Docker ya está instalado"
+            fi
+            
+            # Instalar Git si no existe
+            if ! command -v git &> /dev/null; then
+              echo "📦 Instalando Git..."
+              apt update && apt install -y git
+            else
+              echo "✅ Git ya está instalado"
+            fi
+            
+            # Verificar versiones
+            echo "📋 Versiones instaladas:"
+            docker --version
+            docker compose version
+            git --version
+            
             # Configurar directorio del proyecto
             PROJECT_DIR="/opt/splynx-tickets"
             
@@ -42,7 +69,7 @@ jobs:
             
             # Detener contenedores existentes
             echo "🛑 Deteniendo contenedores..."
-            docker-compose down 2>/dev/null || true
+            docker compose down 2>/dev/null || true
             
             # Limpiar imágenes antiguas
             echo "🧹 Limpiando imágenes antiguas..."
@@ -50,18 +77,22 @@ jobs:
             
             # Construir y levantar con los nuevos cambios
             echo "🏗️  Construyendo nueva imagen..."
-            docker-compose build --no-cache
+            docker compose build --no-cache
             
             echo "🚀 Iniciando contenedores..."
-            docker-compose up -d
+            docker compose up -d
             
             # Esperar a que el contenedor esté listo
             echo "⏳ Esperando que el servicio esté listo..."
-            sleep 10
+            sleep 15
             
             # Mostrar estado
             echo "📊 Estado de contenedores:"
-            docker-compose ps
+            docker compose ps
+            
+            # Mostrar logs recientes
+            echo "📋 Últimos logs:"
+            docker compose logs --tail=30
             
             echo "✅ Despliegue completado exitosamente"
 
@@ -76,37 +107,12 @@ jobs:
             cd /opt/splynx-tickets
             
             # Verificar que el contenedor está corriendo
-            if docker-compose ps | grep -q "Up"; then
+            if docker compose ps | grep -q "Up"; then
               echo "✅ Contenedor corriendo correctamente"
-              
-              # Mostrar logs recientes
-              echo "📋 Últimos logs:"
-              docker-compose logs --tail=20
-              
+              echo "🌐 Aplicación disponible en: http://190.7.234.37:7842"
               exit 0
             else
               echo "❌ Error: Contenedor no está corriendo"
-              docker-compose logs --tail=50
+              docker compose logs --tail=50
               exit 1
-            fi
-
-      - name: Health Check
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: 190.7.234.37
-          username: root
-          password: YmUeXJYrO3
-          port: 22
-          script: |
-            # Verificar que la aplicación responde
-            echo "🏥 Verificando salud de la aplicación..."
-            
-            # Intentar conectar al puerto 7842
-            if timeout 5 bash -c "cat < /dev/null > /dev/tcp/localhost/7842"; then
-              echo "✅ Aplicación respondiendo en puerto 7842"
-              exit 0
-            else
-              echo "⚠️  Aplicación no responde aún en puerto 7842"
-              echo "Esto puede ser normal si la aplicación está iniciando"
-              exit 0
             fi
