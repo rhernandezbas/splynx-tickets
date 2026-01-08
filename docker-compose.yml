@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: app-splynx
     ports:
       - "5605:5605"
     environment:
