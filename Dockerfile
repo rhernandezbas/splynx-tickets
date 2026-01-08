@@ -51,7 +51,7 @@ COPY --chown=appuser:appuser . .
 USER appuser
 
 # Exponer el puerto de la aplicación
-EXPOSE 5605
+EXPOSE 7842
 
 # Variables de entorno por defecto (pueden ser sobrescritas)
 ENV FLASK_APP=app \
@@ -60,7 +60,7 @@ ENV FLASK_APP=app \
 
 # Healthcheck para verificar que la aplicación está corriendo
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:5605/ || exit 1
+    CMD curl -f http://localhost:7842/ || exit 1
 
 # Comando para ejecutar la aplicación
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5605"]
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=7842"]
