@@ -13,6 +13,16 @@ def _archivos_base_dir():
     return os.path.abspath(os.path.join(script_dir, "..", "archivos"))
 
 
+@blueprint.route("/", methods=["GET"])
+def health_check():
+    """Health check endpoint para Docker y monitoreo"""
+    return jsonify({
+        "status": "healthy",
+        "service": "splynx-tickets",
+        "message": "Application is running"
+    }), 200
+
+
 @blueprint.route("/api/tickets/download", methods=["POST"])
 def download_csv():
     """Descargar CSV para un departamento específico de forma asíncrona"""
