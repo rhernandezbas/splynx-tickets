@@ -1,0 +1,62 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            # Navegar al directorio del proyecto
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+            
+            # Pull los últimos cambios
+            git pull origin main
+            
+            # Detener contenedores existentes
+            docker-compose down
+            
+            # Construir y levantar con los nuevos cambios
+            docker-compose up -d --build
+            
+            # Limpiar imágenes antiguas
+            docker image prune -f
+            
+            # Mostrar estado
+            docker-compose ps
+            
+            echo "✅ Despliegue completado exitosamente"
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            # Verificar que el contenedor está corriendo
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+            if docker-compose ps | grep -q "Up"; then
+              echo "✅ Contenedor corriendo correctamente"
+              exit 0
+            else
+              echo "❌ Error: Contenedor no está corriendo"
+              docker-compose logs --tail=50
+              exit 1
+            fi
