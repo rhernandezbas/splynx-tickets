@@ -102,6 +102,64 @@ class SplynxServices:
             print(f"Unexpected error checking ticket {ticket_id}: {e}")
             return None
 
+    def get_unassigned_tickets(self, group_id="4"):
+        """Get all unassigned tickets from a specific group
+        
+        Args:
+            group_id: Group ID to filter tickets (default "4" for Soporte Tecnico)
+            
+        Returns:
+            list: List of unassigned tickets
+        """
+        url = f"{self.base_url}/api/2.0/admin/support/tickets"
+        headers = {
+            "Authorization": f"Splynx-EA (access_token={self.token})",
+        }
+        
+        # Parámetros para filtrar tickets no asignados del grupo de Soporte
+        params = {
+            "group_id": group_id,
+            "assign_to": "0"  # 0 significa no asignado
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params, verify=self.verify_ssl)
+            response.raise_for_status()
+            tickets = response.json()
+            print(f"✅ Encontrados {len(tickets)} tickets no asignados en grupo {group_id}")
+            return tickets
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error obteniendo tickets no asignados: {e}")
+            return []
+
+    def update_ticket_assignment(self, ticket_id: str, assigned_to: int):
+        """Update the assignment of a ticket
+        
+        Args:
+            ticket_id: ID of the ticket to update
+            assigned_to: Person ID to assign the ticket to
+            
+        Returns:
+            dict: Response from API or None if error
+        """
+        url = f"{self.base_url}/api/2.0/admin/support/tickets/{ticket_id}"
+        headers = {
+            "Authorization": f"Splynx-EA (access_token={self.token})",
+        }
+        
+        data = {
+            "assign_to": str(assigned_to)
+        }
+        
+        try:
+            response = requests.patch(url, headers=headers, data=data, verify=self.verify_ssl)
+            response.raise_for_status()
+            print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to}")
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error asignando ticket {ticket_id}: {e}")
+            return None
+
 
     def create_ticket(self, customer_id:str, subject:str, note:str,fecha_creacion, priority:str="medium",
      status_id="1", group_id="4", type_id="10", assigned_to:int=0):

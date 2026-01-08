@@ -4,7 +4,7 @@ import os
 import threading
 from flask import jsonify,current_app
 from app.routes import blueprint
-from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets
+from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets
 
 
 def _archivos_base_dir():
@@ -73,6 +73,23 @@ def all_flow_tickets():
         return jsonify({
             "success": True,
             "message": "Todos los procesos completados en secuencia"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/tickets/assign_unassigned", methods=["POST"])
+def assign_unassigned():
+    """Asigna tickets no asignados del grupo de Soporte Técnico usando round-robin"""
+    try:
+        hilo = threading.Thread(target=thread_assign_unassigned_tickets)
+        hilo.start()
+        return jsonify({
+            "success": True,
+            "message": "Asignación de tickets no asignados iniciada"
         }), 200
     except Exception as e:
         return jsonify({

@@ -300,4 +300,89 @@ class TicketManager:
         # Retornar la lista de tickets creados al final de la función
         return created_tickets if created_tickets else None
 
+    def assign_unassigned_tickets(self, group_id="4"):
+        """Asigna tickets no asignados del grupo de Soporte Técnico usando round-robin
+        
+        Args:
+            group_id: ID del grupo (default "4" para Soporte Técnico)
+            
+        Returns:
+            dict: Resumen de la operación con estadísticas
+        """
+        resultado = {
+            "total_tickets": 0,
+            "asignados_exitosamente": 0,
+            "errores": 0,
+            "detalles": []
+        }
+        
+        try:
+            # Obtener tickets no asignados del grupo
+            tickets = self.splynx.get_unassigned_tickets(group_id)
+            resultado["total_tickets"] = len(tickets)
+            
+            if not tickets:
+                print("No hay tickets sin asignar")
+                return resultado
+            
+            print(f"\n{'='*60}")
+            print(f"🎫 ASIGNANDO {len(tickets)} TICKETS NO ASIGNADOS")
+            print(f"{'='*60}\n")
+            
+            for ticket in tickets:
+                ticket_id = ticket.get('id')
+                subject = ticket.get('subject', 'Sin asunto')
+                customer_id = ticket.get('customer_id', 'N/A')
+                
+                try:
+                    # Asignar usando el mismo método round-robin con horarios
+                    assigned_person_id = self.assign_ticket_fairly()
+                    
+                    # Actualizar el ticket en Splynx
+                    response = self.splynx.update_ticket_assignment(ticket_id, assigned_person_id)
+                    
+                    if response:
+                        resultado["asignados_exitosamente"] += 1
+                        resultado["detalles"].append({
+                            "ticket_id": ticket_id,
+                            "subject": subject,
+                            "customer_id": customer_id,
+                            "assigned_to": assigned_person_id,
+                            "estado": "ASIGNADO"
+                        })
+                        print(f"✅ Ticket {ticket_id} asignado a persona {assigned_person_id}")
+                    else:
+                        resultado["errores"] += 1
+                        resultado["detalles"].append({
+                            "ticket_id": ticket_id,
+                            "subject": subject,
+                            "estado": "ERROR",
+                            "error": "No se pudo actualizar en Splynx"
+                        })
+                        print(f"❌ Error asignando ticket {ticket_id}")
+                        
+                except Exception as e:
+                    resultado["errores"] += 1
+                    resultado["detalles"].append({
+                        "ticket_id": ticket_id,
+                        "subject": subject,
+                        "estado": "ERROR",
+                        "error": str(e)
+                    })
+                    print(f"❌ Error procesando ticket {ticket_id}: {e}")
+            
+            print(f"\n{'='*60}")
+            print(f"✅ ASIGNACIÓN COMPLETADA")
+            print(f"   Total: {resultado['total_tickets']}")
+            print(f"   Asignados: {resultado['asignados_exitosamente']}")
+            print(f"   Errores: {resultado['errores']}")
+            print(f"{'='*60}\n")
+            
+            return resultado
+            
+        except Exception as e:
+            print(f"❌ Error general en asignación de tickets: {e}")
+            resultado["errores"] = resultado["total_tickets"]
+            return resultado
+
 
