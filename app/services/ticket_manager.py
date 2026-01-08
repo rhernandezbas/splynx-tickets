@@ -400,5 +400,3 @@ class TicketManager:
             print(f"❌ Error general en asignación de tickets: {e}")
             resultado["errores"] = resultado["total_tickets"]
             return resultado
-
-

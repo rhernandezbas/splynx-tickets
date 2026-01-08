@@ -163,11 +163,16 @@ class SplynxServices:
         
         try:
             response = requests.put(url, headers=headers, data=data, verify=self.verify_ssl)
+            print(f"📊 Status Code: {response.status_code}")
             response.raise_for_status()
-            print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to}")
-            return response.json()
+            
+            result = response.json()
+            print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to} - Response: {result}")
+            return result
         except requests.exceptions.RequestException as e:
             print(f"❌ Error asignando ticket {ticket_id}: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"📄 Response text: {e.response.text}")
             return None
 
 
