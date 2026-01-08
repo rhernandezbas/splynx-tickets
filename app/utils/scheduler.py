@@ -34,13 +34,24 @@ def run_all_flow_job(app):
         response = requests.post('http://localhost:7842/api/tickets/all_flow', timeout=300)
         
         if response.status_code == 200:
-            print("✅ Endpoint ejecutado exitosamente")
+            print("✅ Endpoint all_flow ejecutado exitosamente")
             print(f"📄 Respuesta: {response.json()}")
         else:
-            print(f"⚠️ Endpoint respondió con código: {response.status_code}")
+            print(f"⚠️ Endpoint all_flow respondió con código: {response.status_code}")
             print(f"📄 Respuesta: {response.text}")
         
-        print(f"{'='*60}")
+        # Llamar al endpoint de asignación de tickets no asignados
+        print("\n📡 Llamando al endpoint /api/tickets/assign_unassigned...")
+        response_assign = requests.post('http://localhost:7842/api/tickets/assign_unassigned', timeout=300)
+        
+        if response_assign.status_code == 200:
+            print("✅ Endpoint assign_unassigned ejecutado exitosamente")
+            print(f"📄 Respuesta: {response_assign.json()}")
+        else:
+            print(f"⚠️ Endpoint assign_unassigned respondió con código: {response_assign.status_code}")
+            print(f"📄 Respuesta: {response_assign.text}")
+        
+        print(f"\n{'='*60}")
         print(f"✅ CRON JOB COMPLETADO - {datetime.now(tz_argentina).strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"{'='*60}\n")
         
