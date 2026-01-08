@@ -164,11 +164,26 @@ class SplynxServices:
         try:
             response = requests.put(url, headers=headers, data=data, verify=self.verify_ssl)
             print(f"📊 Status Code: {response.status_code}")
-            response.raise_for_status()
             
-            result = response.json()
-            print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to} - Response: {result}")
-            return result
+            # Códigos de éxito: 200, 201, 202, 204
+            if response.status_code in [200, 201, 202, 204]:
+                print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to}")
+                
+                # Intentar parsear JSON si hay contenido
+                try:
+                    if response.text:
+                        result = response.json()
+                        print(f"📄 Response: {result}")
+                        return result
+                    else:
+                        # Respuesta vacía pero exitosa
+                        return {"success": True, "ticket_id": ticket_id}
+                except ValueError:
+                    # No es JSON válido pero la asignación fue exitosa
+                    return {"success": True, "ticket_id": ticket_id}
+            else:
+                response.raise_for_status()
+                
         except requests.exceptions.RequestException as e:
             print(f"❌ Error asignando ticket {ticket_id}: {e}")
             if hasattr(e, 'response') and e.response is not None:
