@@ -1,9 +1,6 @@
 from flask import Flask, request
 from app.utils.config import db, migrate, Config
 
-# Variable global para controlar la inicialización del scheduler
-_scheduler_initialized = False
-
 def create_app() -> Flask:
     """Application factory for the app."""
     app = Flask(__name__)
@@ -16,14 +13,9 @@ def create_app() -> Flask:
     from app.routes import blueprint as routes_bp
     app.register_blueprint(routes_bp)
     
-    # Inicializar scheduler después de la primera request
-    @app.before_request
-    def init_scheduler_once():
-        global _scheduler_initialized
-        if not _scheduler_initialized:
-            from app.scheduler import init_scheduler
-            init_scheduler(app)
-            _scheduler_initialized = True
+    # Inicializar scheduler inmediatamente al crear la app
+    from app.scheduler import init_scheduler
+    init_scheduler(app)
 
     # Minimal CORS for development
     @app.after_request
