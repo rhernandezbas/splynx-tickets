@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "app-splynx"
+version = "0.1.0"
+description = ""
+authors = ["rhernandezba <ronald.hernandezbastidas@mercadolibre.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.1.2"
+flask-sqlalchemy = "^3.1.1"
+flask-marshmallow = "^1.3.0"
+flask-migrate = "^4.1.0"
+pymysql = "^1.1.2"
+requests = "^2.32.5"
+selenium = "^4.36.0"
+cryptography = "^46.0.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

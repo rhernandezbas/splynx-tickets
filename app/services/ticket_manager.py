@@ -9,6 +9,8 @@ from app.services.splynx_services import SplynxServices
 
 class TicketManager:
     """Manages ticket operations including filtering and cleanup"""
+    
+    ASSIGNABLE_PERSONS = [10, 27, 37, 38]
 
     def __init__(self, splynx_service: SplynxServices):
         """
@@ -18,6 +20,22 @@ class TicketManager:
             splynx_service: An instance of SplynxServices
         """
         self.splynx = splynx_service
+
+    def assign_ticket_fairly(self) -> int:
+        """Asigna un ticket de forma justa usando round-robin.
+        
+        Returns:
+            int: ID de la persona asignada
+        """
+        from app.interface.interfaces import AssignmentTrackerInterface
+        
+        person_id = AssignmentTrackerInterface.get_person_with_least_tickets(
+            self.ASSIGNABLE_PERSONS
+        )
+        
+        AssignmentTrackerInterface.increment_count(person_id)
+        print(f"Ticket asignado a persona ID: {person_id}")
+        return person_id
 
     def check_ticket_status(self)->str:
         """Verifica el estado de los tickets en Splynx y actualiza la base de datos"""
@@ -51,7 +69,21 @@ class TicketManager:
             incidents = IncidentsInterface.get_all()
 
             # Filtrar solo los que tienen is_created_splynx en falso o 0
-            pending_tickets = [inc for inc in incidents if not inc.is_created_splynx]
+            pending_tickets = []
+            for inc in incidents:
+                if not inc.is_created_splynx:
+                    # Convertir el objeto a diccionario
+                    inc_dict = {
+                        "id": inc.id,
+                        "Cliente": inc.Cliente,
+                        "Asunto": inc.Asunto,
+                        "Fecha_Creacion": inc.Fecha_Creacion,
+                        "Estado": inc.Estado if hasattr(inc, "Estado") else "",
+                        "Prioridad": inc.Prioridad if hasattr(inc, "Prioridad") else "medium",
+                        "Ticket_ID": inc.Ticket_ID if hasattr(inc, "Ticket_ID") else "",
+                        "is_created_splynx": inc.is_created_splynx
+                    }
+                    pending_tickets.append(inc_dict)
 
             # Guardar en el resultado
             resultado["total"] = len(pending_tickets)
@@ -134,69 +166,81 @@ class TicketManager:
     def create_ticket(self):
         """Crea un ticket en Splynx y actualiza la base de datos con el ID devuelto
 
-            
         Returns:
-            str: ID del ticket creado o None si hubo error
+            list: Lista de IDs de tickets creados o lista vacía si hubo error
         """
-
         data = self._check_ticket_bd()
+        created_tickets = []  # Lista para almacenar los IDs de tickets creados
 
         for ticket_data in data["pending_tickets"]:
-
             cliente = ticket_data.get("Cliente", "")
             asunto = ticket_data.get("Asunto", "")
             fecha_creacion = ticket_data.get("Fecha_Creacion", "")
 
-            data = {
+            assigned_person_id = self.assign_ticket_fairly()
+            
+            ticket_data = {
                 "Cliente": cliente,
                 "Asunto": asunto,
                 "note": f"Ticket creado automaticamente por Api Splynx, con fecha original de {fecha_creacion}",
                 "Fecha_Creacion": fecha_creacion,
-                "Prioridad": ticket_data.get("Prioridad", "medium")
+                "Prioridad": ticket_data.get("Prioridad", "medium"),
+                "assigned_to": assigned_person_id
             }
 
             # Crear el ticket en Splynx y obtener la respuesta (que incluye el ID)
             response = self.splynx.create_ticket(
-                customer_id=data["Cliente"],
-                subject=data["Asunto"],
-                note=data["note"],
-                fecha_creacion=data["Fecha_Creacion"],
-                priority=data["Prioridad"]
+                customer_id=ticket_data["Cliente"],
+                subject=ticket_data["Asunto"],
+                note=ticket_data["note"],
+                fecha_creacion=ticket_data["Fecha_Creacion"],
+                priority=ticket_data["Prioridad"],
+                assigned_to=assigned_person_id
             )
 
             # Verificar si se creó correctamente y obtener el ID
             if response and isinstance(response, dict) and 'id' in response:
                 ticket_id = str(response['id'])
+                created_tickets.append(ticket_id)  # Agregar el ID a la lista de tickets creados
 
                 # Actualizar el registro en la base de datos
                 self._update_ticket_id_in_db(
-                    customer_id=data["Cliente"],
-                    subject=data["Asunto"],
-                    fecha_creacion=data["Fecha_Creacion"],
+                    customer_id=ticket_data["Cliente"],
+                    subject=ticket_data["Asunto"],
+                    fecha_creacion=ticket_data["Fecha_Creacion"],
                     ticket_id=ticket_id
                 )
-
-                # Actualizar el estado is_created_splynx a True
+                
+                # Actualizar assigned_to en la base de datos
                 from app.interface.interfaces import IncidentsInterface
                 try:
-                    # Buscar el incidente correspondiente
                     incidents = IncidentsInterface.get_all()
                     for incident in incidents:
                         if (incident.Cliente == cliente and
                                 incident.Asunto == asunto and
                                 incident.Fecha_Creacion == fecha_creacion):
-                            # Actualizar estado
-                            update_data = {
-                                "is_created_splynx": True
-                            }
+                            update_data = {"assigned_to": assigned_person_id}
+                            IncidentsInterface.update(incident.id, update_data)
+                            print(f"Actualizado assigned_to={assigned_person_id} para ticket {ticket_id}")
+                            break
+                except Exception as e:
+                    print(f"Error al actualizar assigned_to: {e}")
+
+                # Actualizar el estado is_created_splynx a True
+                try:
+                    incidents = IncidentsInterface.get_all()
+                    for incident in incidents:
+                        if (incident.Cliente == cliente and
+                                incident.Asunto == asunto and
+                                incident.Fecha_Creacion == fecha_creacion):
+                            update_data = {"is_created_splynx": True}
                             IncidentsInterface.update(incident.id, update_data)
                             print(f"Actualizado is_created_splynx=True para ticket {ticket_id}")
                             break
                 except Exception as e:
                     print(f"Error al actualizar is_created_splynx: {e}")
 
-                return ticket_id
-            return None
-        return None
+        # Retornar la lista de tickets creados al final de la función
+        return created_tickets if created_tickets else None
 
 

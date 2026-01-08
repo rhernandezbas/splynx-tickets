@@ -30,11 +30,11 @@ migrate = Migrate()
 
 class Config:
 
-    DB_USER = "root"
-    DB_PASSWORD = "RoxZ3008$"
-    DB_HOST = "localhost"
-    DB_PORT = "3306"
-    DB_NAME = "ipnext_gr"
+    DB_USER = "mysql"
+    DB_PASSWORD = "1234"
+    DB_HOST = "190.7.234.37"
+    DB_PORT = "3025"
+    DB_NAME = "ipnext"
 
     # Use connect_args to specify authentication options
     SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -45,7 +45,6 @@ class Config:
         'pool_pre_ping': True,
         'connect_args': {
             'charset': 'utf8mb4',
-            'use_unicode': True,
-            'ssl': {'fake_flag_to_enable_tls': True}  # This enables TLS without verification
+            'use_unicode': True
         }
     }

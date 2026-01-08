@@ -8,7 +8,7 @@ class SplynxServices:
     """class to get splynx services"""
     
     def __init__(self, verify_ssl=False):
-        self.base_url = "https://ipnext.splynx.app"
+        self.base_url = "https://splynx.ipnext.com.ar"
         self.user = "Ronald"
         self.password = "Ronald2025!"
         
@@ -72,6 +72,8 @@ class SplynxServices:
             print(f"Request Error: {e}")
             raise
 
+
+
     def get_ticket_data_status(self, ticket_id: str):
         """Get the status of a ticket by its ID
         
@@ -102,7 +104,7 @@ class SplynxServices:
 
 
     def create_ticket(self, customer_id:str, subject:str, note:str,fecha_creacion, priority:str="medium",
-     status_id="1", group_id="4", type_id="10", ):
+     status_id="1", group_id="4", type_id="10", assigned_to:int=0):
         """Create a ticket in Splynx with simplified parameters"""
 
         token = self.token
@@ -116,7 +118,7 @@ class SplynxServices:
             'customer_id': str(customer_id),
             'reporter_type': "customer",
             'hidden': "false",
-            'assign_to': "0",
+            'assign_to': str(assigned_to),
             'status_id': str(status_id),
             'group_id': str(group_id),
             'type_id': str(type_id),    

@@ -3,7 +3,6 @@ Funciones para ejecución en hilos
 Estas funciones son versiones de las funciones de views.py que no dependen de Flask
 """
 
-import os
 from app.services.splynx_services import SplynxServices
 from app.services.ticket_manager import TicketManager
 from app.services.selenium_multi_departamentos import SeleniumMultiDepartamentos
@@ -19,16 +18,6 @@ def thread_download_csv():
     print("Descarga de CSV completada para todos los departamentos")
     return True
 
-
-def thread_tickets_summary():
-    """Versión para hilos de tickets_summary"""
-    sp = SplynxServices()
-    tk = TicketManager(sp)
-    data = tk.check_ticket_splynx()
-    print("Tickets verificados y guardados en tickets_status.txt")
-    return data
-
-
 def thread_close_tickets():
     """Versión para hilos de close_tickets"""
     sp = SplynxServices()
@@ -38,17 +27,16 @@ def thread_close_tickets():
     return data
 
 
-def thread_create_tickets():
+def thread_create_tickets(app):
     """Versión para hilos de create_tickets"""
-    sp = SplynxServices()
-    tk = TicketManager(sp)
-    items = tk.read_clientes_extraidos()
-    
-    try:
-        for item in items:
-            tk.create_ticket(item)
-        print("Tickets creados exitosamente")
-        return True
-    except Exception as e:
-        print(f"Error al crear tickets: {str(e)}")
-        return False
+    with app.app_context():
+        sp = SplynxServices()
+        tk = TicketManager(sp)
+
+        try:
+            tk.create_ticket()
+            print("Tickets creados exitosamente")
+            return True
+        except Exception as e:
+            print(f"Error al crear tickets: {str(e)}")
+            return False

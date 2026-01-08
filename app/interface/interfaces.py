@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Union
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils.config import db
-from app.models.models import IncidentsDetection
+from app.models.models import IncidentsDetection, AssignmentTracker
 
 
 class BaseInterface:
@@ -57,7 +57,8 @@ class IncidentsInterface(BaseInterface):
                 Ticket_ID=data.get('Ticket_ID'),
                 Estado=data.get('Estado'),
                 Prioridad=data.get('Prioridad'),
-                is_created_splynx=data.get('is_created_splynx', False)
+                is_created_splynx=data.get('is_created_splynx', False),
+                assigned_to=data.get('assigned_to')
             )
             
             if BaseInterface.add_item(incident):
@@ -130,6 +131,8 @@ class IncidentsInterface(BaseInterface):
                 incident.Prioridad = data['Prioridad']
             if 'is_created_splynx' in data:
                 incident.is_created_splynx = data['is_created_splynx']
+            if 'assigned_to' in data:
+                incident.assigned_to = data['assigned_to']
             
             if BaseInterface.commit_changes():
                 return incident
@@ -210,3 +213,89 @@ class IncidentsInterface(BaseInterface):
         except SQLAlchemyError as e:
             print(f"Error finding incidents by status: {str(e)}")
             return []
+
+
+class AssignmentTrackerInterface(BaseInterface):
+    """Interface for AssignmentTracker model."""
+    
+    @staticmethod
+    def create(person_id: int) -> Optional[AssignmentTracker]:
+        """Create a new assignment tracker for a person."""
+        try:
+            from datetime import datetime
+            tracker = AssignmentTracker(
+                person_id=person_id,
+                ticket_count=0,
+                last_assigned=datetime.now()
+            )
+            if BaseInterface.add_item(tracker):
+                return tracker
+            return None
+        except Exception as e:
+            print(f"Error creating assignment tracker: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_person_id(person_id: int) -> Optional[AssignmentTracker]:
+        """Get tracker by person ID."""
+        try:
+            return AssignmentTracker.query.filter_by(person_id=person_id).first()
+        except SQLAlchemyError as e:
+            print(f"Error getting tracker by person ID: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_all() -> List[AssignmentTracker]:
+        """Get all trackers."""
+        try:
+            return AssignmentTracker.query.all()
+        except SQLAlchemyError as e:
+            print(f"Error getting all trackers: {str(e)}")
+            return []
+    
+    @staticmethod
+    def increment_count(person_id: int) -> bool:
+        """Increment ticket count for a person."""
+        try:
+            from datetime import datetime
+            tracker = AssignmentTrackerInterface.get_by_person_id(person_id)
+            if not tracker:
+                tracker = AssignmentTrackerInterface.create(person_id)
+                if not tracker:
+                    return False
+            
+            tracker.ticket_count += 1
+            tracker.last_assigned = datetime.now()
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            print(f"Error incrementing count: {str(e)}")
+            return False
+    
+    @staticmethod
+    def get_person_with_least_tickets(person_ids: List[int]) -> int:
+        """Get person ID with least assigned tickets."""
+        try:
+            trackers = {}
+            for person_id in person_ids:
+                tracker = AssignmentTrackerInterface.get_by_person_id(person_id)
+                if tracker:
+                    trackers[person_id] = tracker.ticket_count
+                else:
+                    trackers[person_id] = 0
+            
+            return min(trackers, key=trackers.get)
+        except Exception as e:
+            print(f"Error getting person with least tickets: {str(e)}")
+            return person_ids[0]
+    
+    @staticmethod
+    def reset_all_counts() -> bool:
+        """Reset all ticket counts to 0."""
+        try:
+            trackers = AssignmentTrackerInterface.get_all()
+            for tracker in trackers:
+                tracker.ticket_count = 0
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            print(f"Error resetting counts: {str(e)}")
+            return False
