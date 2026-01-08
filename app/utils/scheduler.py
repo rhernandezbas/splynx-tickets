@@ -8,6 +8,12 @@ from apscheduler.triggers.interval import IntervalTrigger
 import requests
 from datetime import datetime
 import pytz
+import os
+import atexit
+
+# Variable global para evitar múltiples schedulers
+_scheduler_instance = None
+_scheduler_lock_file = '/tmp/splynx_scheduler.lock'
 
 
 def run_all_flow_job(app):
@@ -19,6 +25,7 @@ def run_all_flow_job(app):
     
     print(f"\n{'='*60}")
     print(f"🕐 CRON JOB INICIADO - {now.strftime('%Y-%m-%d %H:%M:%S')} (Argentina)")
+    print(f"🔧 PID: {os.getpid()}")
     print(f"{'='*60}")
     
     try:
@@ -45,8 +52,45 @@ def run_all_flow_job(app):
         print(f"{'='*60}\n")
 
 
+def _cleanup_lock():
+    """Limpia el archivo de lock al salir"""
+    try:
+        if os.path.exists(_scheduler_lock_file):
+            os.remove(_scheduler_lock_file)
+            print("🧹 Lock file removido")
+    except Exception as e:
+        print(f"⚠️ Error al remover lock file: {e}")
+
+
 def init_scheduler(app):
     """Inicializa el scheduler con la tarea programada"""
+    global _scheduler_instance
+    
+    # Verificar si ya existe una instancia
+    if _scheduler_instance is not None:
+        print("⚠️ Scheduler ya existe en este proceso, omitiendo...")
+        return _scheduler_instance
+    
+    # Verificar lock file para evitar múltiples schedulers entre procesos
+    if os.path.exists(_scheduler_lock_file):
+        try:
+            with open(_scheduler_lock_file, 'r') as f:
+                existing_pid = f.read().strip()
+            print(f"⚠️ Scheduler ya está corriendo en PID {existing_pid}, omitiendo...")
+            return None
+        except Exception as e:
+            print(f"⚠️ Error leyendo lock file: {e}")
+            # Continuar de todas formas
+    
+    # Crear lock file con el PID actual
+    try:
+        with open(_scheduler_lock_file, 'w') as f:
+            f.write(str(os.getpid()))
+        # Registrar limpieza al salir
+        atexit.register(_cleanup_lock)
+    except Exception as e:
+        print(f"⚠️ No se pudo crear lock file: {e}")
+    
     scheduler = BackgroundScheduler(timezone='America/Argentina/Buenos_Aires')
     
     # Agregar job que se ejecuta cada 10 minutos
@@ -60,11 +104,13 @@ def init_scheduler(app):
     
     # Iniciar el scheduler
     scheduler.start()
+    _scheduler_instance = scheduler
     
     print("\n" + "="*60)
     print("⏰ SCHEDULER INICIADO")
     print("📋 Tarea: Ejecutar all_flow cada 10 minutos")
     print("🌎 Zona horaria: America/Argentina/Buenos_Aires")
+    print(f"🔧 PID: {os.getpid()}")
     print("="*60 + "\n")
     
     # Ejecutar inmediatamente al iniciar
