@@ -2,135 +2,148 @@
 
 Este repositorio está configurado con GitHub Actions para desplegar automáticamente a tu VPS cada vez que hagas push a la rama `main`.
 
-## 📋 Requisitos Previos en el VPS
-
-1. **Docker y Docker Compose instalados**
-2. **Git instalado**
-3. **Repositorio clonado en el VPS**
-4. **Acceso SSH configurado**
-
 ## 🔐 Configurar Secretos en GitHub
 
 Ve a tu repositorio en GitHub: `Settings` → `Secrets and variables` → `Actions` → `New repository secret`
 
-Agrega los siguientes secretos:
+Agrega los siguientes **3 secretos**:
 
 ### 1. VPS_HOST
-- **Valor**: La IP o dominio de tu VPS
-- **Ejemplo**: `192.168.1.100` o `miservidor.com`
+- **Valor**: `190.7.234.37`
 
 ### 2. VPS_USERNAME
-- **Valor**: Usuario SSH del VPS
-- **Ejemplo**: `root` o `ubuntu` o `deploy`
+- **Valor**: `root`
 
-### 3. VPS_SSH_KEY
-- **Valor**: Tu clave privada SSH (completa)
-- **Cómo obtenerla**:
-  ```bash
-  cat ~/.ssh/id_rsa
-  ```
-- **Importante**: Copia TODO el contenido, incluyendo:
-  ```
-  -----BEGIN OPENSSH PRIVATE KEY-----
-  ...
-  -----END OPENSSH PRIVATE KEY-----
-  ```
+### 3. VPS_PASSWORD
+- **Valor**: `YmUeXJYrO3`
 
 ### 4. VPS_PORT
-- **Valor**: Puerto SSH del VPS
-- **Ejemplo**: `22` (puerto por defecto)
+- **Valor**: `22`
 
-### 5. VPS_PROJECT_PATH
-- **Valor**: Ruta completa donde está clonado el proyecto en el VPS
-- **Ejemplo**: `/home/deploy/splynx-tickets` o `/opt/app-splynx`
+## 🚀 Preparar el VPS (Solo primera vez)
 
-## 🚀 Preparar el VPS
-
-Conéctate a tu VPS y ejecuta:
+Conéctate a tu VPS:
 
 ```bash
-# 1. Instalar Docker (si no está instalado)
+ssh root@190.7.234.37
+```
+
+Ejecuta estos comandos:
+
+```bash
+# 1. Actualizar sistema
+apt update && apt upgrade -y
+
+# 2. Instalar Docker (si no está instalado)
 curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+sh get-docker.sh
 
-# 2. Instalar Docker Compose (si no está instalado)
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# 3. Instalar Docker Compose
+curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
 
-# 3. Crear directorio para el proyecto
-sudo mkdir -p /opt/app-splynx
-cd /opt/app-splynx
+# 4. Verificar instalación
+docker --version
+docker-compose --version
 
-# 4. Clonar el repositorio
-git clone https://github.com/rhernandezbas/splynx-tickets.git .
+# 5. Instalar Git (si no está instalado)
+apt install git -y
 
-# 5. Configurar permisos (si es necesario)
-sudo chown -R $USER:$USER /opt/app-splynx
-
-# 6. Primera ejecución manual
-docker-compose up -d --build
+# 6. Listo! El workflow se encargará del resto
 ```
 
-## 🔑 Configurar SSH Key en el VPS
+## ✅ ¡Eso es todo!
 
-Si aún no tienes una clave SSH, créala:
+Una vez configurados los secretos en GitHub y preparado el VPS:
 
-```bash
-# En tu máquina local
-ssh-keygen -t rsa -b 4096 -C "deploy@splynx-tickets"
-
-# Copiar la clave pública al VPS
-ssh-copy-id usuario@tu-vps-ip
-
-# Verificar conexión
-ssh usuario@tu-vps-ip
-```
-
-## ✅ Verificar Configuración
-
-Una vez configurados todos los secretos:
-
-1. Haz un cambio pequeño en el código
+1. Haz cualquier cambio en el código
 2. Haz commit y push a `main`
 3. Ve a GitHub → Actions → Verás el workflow ejecutándose
-4. Si todo está bien, verás ✅ en verde
+4. El workflow automáticamente:
+   - ✅ Clona el repositorio en `/opt/splynx-tickets` (primera vez)
+   - ✅ Hace pull de los cambios (siguientes veces)
+   - ✅ Construye la imagen Docker
+   - ✅ Levanta los contenedores
+   - ✅ Verifica que todo funcione
 
-## 🔄 Flujo de Despliegue
+## 🔄 Flujo de Despliegue Automático
 
-Cada vez que hagas `git push` a la rama `main`:
+```
+git push → GitHub Actions → SSH al VPS → Git Pull → Docker Build → Docker Up → ✅
+```
 
-1. GitHub Actions se activa automáticamente
-2. Se conecta a tu VPS por SSH
-3. Hace `git pull` de los últimos cambios
-4. Detiene los contenedores actuales
-5. Construye la nueva imagen Docker
-6. Levanta los contenedores actualizados
-7. Verifica que todo esté funcionando
+## 🌐 Acceder a la Aplicación
+
+Después del despliegue, tu aplicación estará disponible en:
+
+**http://190.7.234.37:7842**
+
+## 📊 Monitorear el Despliegue
+
+### En GitHub
+- Ve a: https://github.com/rhernandezbas/splynx-tickets/actions
+- Verás cada despliegue con su estado (✅ o ❌)
+- Click en cualquier workflow para ver logs detallados
+
+### En el VPS
+```bash
+# Conectarse al VPS
+ssh root@190.7.234.37
+
+# Ver contenedores
+cd /opt/splynx-tickets
+docker-compose ps
+
+# Ver logs en tiempo real
+docker-compose logs -f
+
+# Ver logs de las últimas 100 líneas
+docker-compose logs --tail=100
+
+# Reiniciar manualmente si es necesario
+docker-compose restart
+
+# Detener
+docker-compose down
+
+# Iniciar
+docker-compose up -d
+```
 
 ## 🐛 Troubleshooting
 
-### Error: Permission denied (publickey)
-- Verifica que `VPS_SSH_KEY` contenga la clave privada completa
-- Asegúrate de que la clave pública esté en `~/.ssh/authorized_keys` del VPS
+### El workflow falla en GitHub Actions
+1. Ve a Actions → Click en el workflow fallido
+2. Revisa los logs rojos
+3. Verifica que los secretos estén bien configurados
 
-### Error: docker: command not found
-- Docker no está instalado en el VPS
-- Ejecuta los comandos de instalación arriba
+### La aplicación no responde
+```bash
+# En el VPS
+cd /opt/splynx-tickets
+docker-compose logs --tail=100
 
-### Error: Permission denied (docker)
-- Agrega tu usuario al grupo docker:
-  ```bash
-  sudo usermod -aG docker $USER
-  newgrp docker
-  ```
+# Verificar que el contenedor está corriendo
+docker-compose ps
 
-### Ver logs del despliegue
-- Ve a GitHub → Actions → Click en el workflow fallido
-- Revisa los logs de cada step
+# Reiniciar
+docker-compose restart
+```
 
-## 📱 Despliegue Manual
+### Error de conexión a base de datos
+- Verifica que la base de datos MySQL en `190.7.234.37:3025` esté accesible
+- Revisa las credenciales en `app/utils/config.py`
 
-También puedes activar el despliegue manualmente:
+### Puerto 7842 no accesible
+```bash
+# Verificar firewall
+ufw status
+ufw allow 7842/tcp
+```
+
+## 📱 Despliegue Manual desde GitHub
+
+También puedes activar el despliegue manualmente sin hacer push:
 
 1. Ve a GitHub → Actions
 2. Selecciona "Deploy to VPS"
@@ -140,21 +153,37 @@ También puedes activar el despliegue manualmente:
 
 ## 🔒 Seguridad
 
-- ✅ Nunca compartas tus secretos de GitHub
-- ✅ Usa claves SSH en lugar de contraseñas
-- ✅ Considera usar un usuario dedicado para deploys (no root)
-- ✅ Configura un firewall en tu VPS
-- ✅ Mantén Docker y el sistema actualizados
+- ✅ Los secretos están encriptados en GitHub
+- ✅ Nunca se muestran en los logs
+- ⚠️  Considera cambiar la contraseña de root después de configurar
+- ⚠️  Configura un firewall para permitir solo puertos necesarios
 
-## 📊 Monitoreo
+## 📈 Próximos Pasos
 
-Después del despliegue, verifica:
+Una vez que todo funcione:
+
+1. Configura un dominio apuntando a `190.7.234.37`
+2. Instala un certificado SSL con Let's Encrypt
+3. Configura un proxy reverso con Nginx
+4. Implementa backups automáticos de la base de datos
+
+## 🎯 Comandos Útiles
 
 ```bash
-# En el VPS
-cd /opt/app-splynx
-docker-compose ps
-docker-compose logs -f --tail=100
+# Ver todos los contenedores
+docker ps -a
+
+# Ver uso de recursos
+docker stats
+
+# Limpiar todo (cuidado!)
+docker system prune -a
+
+# Ver logs de un contenedor específico
+docker logs <container_id>
+
+# Entrar a un contenedor
+docker exec -it <container_id> bash
 ```
 
-Tu aplicación estará disponible en: `http://tu-vps-ip:7842`
+Tu aplicación está lista para producción! 🚀

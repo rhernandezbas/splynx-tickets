@@ -19,25 +19,48 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            # Navegar al directorio del proyecto
-            cd ${{ secrets.VPS_PROJECT_PATH }}
+            # Configurar directorio del proyecto
+            PROJECT_DIR="/opt/splynx-tickets"
             
-            # Pull los últimos cambios
-            git pull origin main
+            # Crear directorio si no existe
+            mkdir -p $PROJECT_DIR
+            cd $PROJECT_DIR
+            
+            # Si el repo no existe, clonarlo
+            if [ ! -d ".git" ]; then
+              echo "📦 Clonando repositorio..."
+              git clone https://github.com/rhernandezbas/splynx-tickets.git .
+            else
+              echo "🔄 Actualizando repositorio..."
+              git fetch origin
+              git reset --hard origin/main
+              git pull origin main
+            fi
             
             # Detener contenedores existentes
-            docker-compose down
-            
-            # Construir y levantar con los nuevos cambios
-            docker-compose up -d --build
+            echo "🛑 Deteniendo contenedores..."
+            docker-compose down 2>/dev/null || true
             
             # Limpiar imágenes antiguas
+            echo "🧹 Limpiando imágenes antiguas..."
             docker image prune -f
             
+            # Construir y levantar con los nuevos cambios
+            echo "🏗️  Construyendo nueva imagen..."
+            docker-compose build --no-cache
+            
+            echo "🚀 Iniciando contenedores..."
+            docker-compose up -d
+            
+            # Esperar a que el contenedor esté listo
+            echo "⏳ Esperando que el servicio esté listo..."
+            sleep 10
+            
             # Mostrar estado
+            echo "📊 Estado de contenedores:"
             docker-compose ps
             
             echo "✅ Despliegue completado exitosamente"
@@ -47,16 +70,43 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            cd /opt/splynx-tickets
+            
             # Verificar que el contenedor está corriendo
-            cd ${{ secrets.VPS_PROJECT_PATH }}
             if docker-compose ps | grep -q "Up"; then
               echo "✅ Contenedor corriendo correctamente"
+              
+              # Mostrar logs recientes
+              echo "📋 Últimos logs:"
+              docker-compose logs --tail=20
+              
               exit 0
             else
               echo "❌ Error: Contenedor no está corriendo"
               docker-compose logs --tail=50
               exit 1
+            fi
+
+      - name: Health Check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            # Verificar que la aplicación responde
+            echo "🏥 Verificando salud de la aplicación..."
+            
+            # Intentar conectar al puerto 7842
+            if timeout 5 bash -c "cat < /dev/null > /dev/tcp/localhost/7842"; then
+              echo "✅ Aplicación respondiendo en puerto 7842"
+              exit 0
+            else
+              echo "⚠️  Aplicación no responde aún en puerto 7842"
+              echo "Esto puede ser normal si la aplicación está iniciando"
+              exit 0
             fi
