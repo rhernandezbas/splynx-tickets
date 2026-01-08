@@ -127,13 +127,16 @@ class SplynxServices:
             response.raise_for_status()
             all_tickets = response.json()
             
-            # Filtrar tickets que no estén cerrados (closed = "1" o 1)
+            # Filtrar tickets que:
+            # 1. No estén cerrados (closed != "1")
+            # 2. No tengan asignación (assign_to == 0 o "0")
             filtered_tickets = [
                 ticket for ticket in all_tickets 
                 if ticket.get('closed') not in ['1', 1]
+                and ticket.get('assign_to') in [0, '0']
             ]
             
-            print(f"✅ Encontrados {len(filtered_tickets)} tickets no asignados (abiertos) de {len(all_tickets)} totales en grupo {group_id}")
+            print(f"✅ Encontrados {len(filtered_tickets)} tickets sin asignar (abiertos) de {len(all_tickets)} totales en grupo {group_id}")
             return filtered_tickets
         except requests.exceptions.RequestException as e:
             print(f"❌ Error obteniendo tickets no asignados: {e}")
@@ -159,7 +162,7 @@ class SplynxServices:
         }
         
         try:
-            response = requests.patch(url, headers=headers, data=data, verify=self.verify_ssl)
+            response = requests.put(url, headers=headers, data=data, verify=self.verify_ssl)
             response.raise_for_status()
             print(f"✅ Ticket {ticket_id} asignado a persona {assigned_to}")
             return response.json()
