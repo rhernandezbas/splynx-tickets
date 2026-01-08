@@ -23,8 +23,8 @@ class TicketManager:
         """
         self.splynx = splynx_service
 
-    def assign_ticket_fairly(self) -> int:
-        """Asigna un ticket según el horario de trabajo en zona horaria de Argentina.
+    def get_next_assignee(self) -> int:
+        """Obtiene la siguiente persona a asignar según horario y round-robin, SIN incrementar contador.
         
         Turnos:
         - ID 10 y 37: 12:00 AM - 8:00 AM (turno nocturno)
@@ -34,7 +34,7 @@ class TicketManager:
         - ID 38: 5:00 PM - 11:00 PM
         
         Returns:
-            int: ID de la persona asignada según el horario
+            int: ID de la persona a asignar según el horario
         """
         from app.interface.interfaces import AssignmentTrackerInterface
         
@@ -84,6 +84,17 @@ class TicketManager:
             )
             print(f"✅ Asignando en horario laboral ({current_hour}:{current_minute:02d}). Disponibles: {available_persons}")
         
+        return person_id
+
+    def assign_ticket_fairly(self) -> int:
+        """Asigna un ticket según el horario de trabajo e incrementa el contador.
+        
+        Returns:
+            int: ID de la persona asignada según el horario
+        """
+        from app.interface.interfaces import AssignmentTrackerInterface
+        
+        person_id = self.get_next_assignee()
         AssignmentTrackerInterface.increment_count(person_id)
         print(f"🎫 Ticket asignado a persona ID: {person_id}")
         return person_id
@@ -335,13 +346,18 @@ class TicketManager:
                 customer_id = ticket.get('customer_id', 'N/A')
                 
                 try:
-                    # Asignar usando el mismo método round-robin con horarios
-                    assigned_person_id = self.assign_ticket_fairly()
+                    from app.interface.interfaces import AssignmentTrackerInterface
+                    
+                    # Obtener la siguiente persona a asignar SIN incrementar el contador
+                    assigned_person_id = self.get_next_assignee()
                     
                     # Actualizar el ticket en Splynx
                     response = self.splynx.update_ticket_assignment(ticket_id, assigned_person_id)
                     
                     if response:
+                        # Solo incrementar el contador si la asignación fue exitosa
+                        AssignmentTrackerInterface.increment_count(assigned_person_id)
+                        
                         resultado["asignados_exitosamente"] += 1
                         resultado["detalles"].append({
                             "ticket_id": ticket_id,
