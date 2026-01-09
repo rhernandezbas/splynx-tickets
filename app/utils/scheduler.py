@@ -114,14 +114,13 @@ def init_scheduler(app):
     )
     
     # Agregar job para notificaciones de fin de turno (cada hora)
-    # DESHABILITADO: Descomentar cuando se necesite usar notificaciones de fin de turno
-    # scheduler.add_job(
-    #     func=lambda: requests.post('http://localhost:7842/api/tickets/end_of_shift_notifications'),
-    #     trigger=IntervalTrigger(hours=1),
-    #     id='end_of_shift_notifications_job',
-    #     name='Verificar notificaciones de fin de turno cada hora',
-    #     replace_existing=True
-    # )
+    scheduler.add_job(
+        func=lambda: requests.post('http://localhost:7842/api/tickets/end_of_shift_notifications'),
+        trigger=IntervalTrigger(hours=1),
+        id='end_of_shift_notifications_job',
+        name='Verificar notificaciones de fin de turno cada hora',
+        replace_existing=True
+    )
     
     # Iniciar el scheduler
     scheduler.start()
@@ -131,7 +130,7 @@ def init_scheduler(app):
     print("⏰ SCHEDULER INICIADO")
     print("📋 Tareas programadas:")
     print("   • all_flow cada 3 minutos")
-    # print("   • Notificaciones de fin de turno cada hora")  # DESHABILITADO
+    print("   • Notificaciones de fin de turno cada hora")
     print("🌎 Zona horaria: America/Argentina/Buenos_Aires")
     print(f"🔧 PID: {os.getpid()}")
     print("="*60 + "\n")

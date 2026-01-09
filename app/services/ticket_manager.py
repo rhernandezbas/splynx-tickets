@@ -23,21 +23,43 @@ class TicketManager:
         """
         self.splynx = splynx_service
 
-    def get_next_assignee(self) -> int:
+    def get_next_assignee(self, ticket_note: str = None) -> int:
         """Obtiene la siguiente persona a asignar según horario y round-robin, SIN incrementar contador.
         
-        Turnos:
+        Si la nota del ticket contiene etiquetas especiales, asigna según turno:
+        - [TT] = Turno Tarde -> IDs 27, 38 (Luis, Yaini)
+        - [TD] = Turno Día -> IDs 10, 37 (Gabriel, Cesareo)
+        
+        Turnos normales:
         - ID 10 y 37: 12:00 AM - 8:00 AM (turno nocturno)
         - ID 37: 8:00 AM - 3:00 PM
         - ID 10: 8:00 AM - 4:00 PM
         - ID 27: 10:00 AM - 5:20 PM
         - ID 38: 5:00 PM - 11:00 PM
         
+        Args:
+            ticket_note: Nota del ticket para verificar etiquetas [TT] o [TD]
+        
         Returns:
-            int: ID de la persona a asignar según el horario
+            int: ID de la persona a asignar según el horario o etiqueta
         """
         from app.interface.interfaces import AssignmentTrackerInterface
+        from app.utils.constants import TURNO_TARDE_IDS, TURNO_DIA_IDS
         
+        # Verificar si hay etiqueta de turno en la nota
+        if ticket_note:
+            if "[TT]" in ticket_note:
+                # Turno Tarde: asignar a Luis (27) o Yaini (38)
+                person_id = AssignmentTrackerInterface.get_person_with_least_tickets(TURNO_TARDE_IDS)
+                print(f"🏷️  Etiqueta [TT] detectada - Asignando a turno tarde: {person_id}")
+                return person_id
+            elif "[TD]" in ticket_note:
+                # Turno Día: asignar a Gabriel (10) o Cesareo (37)
+                person_id = AssignmentTrackerInterface.get_person_with_least_tickets(TURNO_DIA_IDS)
+                print(f"🏷️  Etiqueta [TD] detectada - Asignando a turno día: {person_id}")
+                return person_id
+        
+        # Si no hay etiqueta, usar lógica normal por horario
         # Obtener hora actual en Argentina
         tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
         now = datetime.now(tz_argentina)
@@ -733,6 +755,20 @@ class TicketManager:
         Returns:
             dict: Resumen de la operación con estadísticas
         """
+        # Verificar si el sistema está pausado
+        from app.utils.system_control import SystemControl
+        
+        if SystemControl.is_paused():
+            print("⏸️  Sistema PAUSADO - No se asignarán tickets")
+            return {
+                "total_tickets": 0,
+                "asignados_exitosamente": 0,
+                "errores": 0,
+                "detalles": [],
+                "system_paused": True,
+                "message": "Sistema pausado - asignación deshabilitada"
+            }
+        
         resultado = {
             "total_tickets": 0,
             "asignados_exitosamente": 0,
@@ -757,12 +793,14 @@ class TicketManager:
                 ticket_id = ticket.get('id')
                 subject = ticket.get('subject', 'Sin asunto')
                 customer_id = ticket.get('customer_id', 'N/A')
+                note = ticket.get('note', '')  # Obtener la nota del ticket
                 
                 try:
                     from app.interface.interfaces import AssignmentTrackerInterface
                     
                     # Obtener la siguiente persona a asignar SIN incrementar el contador
-                    assigned_person_id = self.get_next_assignee()
+                    # Pasar la nota para verificar etiquetas [TT] o [TD]
+                    assigned_person_id = self.get_next_assignee(ticket_note=note)
                     
                     # Actualizar el ticket en Splynx
                     response = self.splynx.update_ticket_assignment(ticket_id, assigned_person_id)

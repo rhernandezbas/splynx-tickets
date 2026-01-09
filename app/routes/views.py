@@ -129,3 +129,71 @@ def end_of_shift_notifications():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@blueprint.route("/api/system/pause", methods=["POST"])
+def pause_system():
+    """Pausa el sistema - detiene asignación automática y procesos"""
+    try:
+        from flask import request
+        from app.utils.system_control import SystemControl
+        
+        data = request.get_json() or {}
+        reason = data.get("reason", "Pausa manual")
+        paused_by = data.get("paused_by", "manual")
+        
+        state = SystemControl.pause(reason=reason, paused_by=paused_by)
+        
+        return jsonify({
+            "success": True,
+            "message": "Sistema pausado exitosamente",
+            "state": state
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/system/resume", methods=["POST"])
+def resume_system():
+    """Reanuda el sistema - reactiva asignación automática y procesos"""
+    try:
+        from flask import request
+        from app.utils.system_control import SystemControl
+        
+        data = request.get_json() or {}
+        resumed_by = data.get("resumed_by", "manual")
+        
+        state = SystemControl.resume(resumed_by=resumed_by)
+        
+        return jsonify({
+            "success": True,
+            "message": "Sistema reanudado exitosamente",
+            "state": state
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/system/status", methods=["GET"])
+def system_status():
+    """Obtiene el estado actual del sistema"""
+    try:
+        from app.utils.system_control import SystemControl
+        
+        status = SystemControl.get_status()
+        
+        return jsonify({
+            "success": True,
+            "status": status
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

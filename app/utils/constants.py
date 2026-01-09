@@ -31,7 +31,11 @@ DEPARTAMENTOS = {
 
 # Feature flag para habilitar/deshabilitar todas las notificaciones de WhatsApp
 # True = Envía notificaciones | False = No envía notificaciones
-WHATSAPP_ENABLED = False
+WHATSAPP_ENABLED = True
+
+# Feature flag para pausar/reanudar el sistema completo
+# True = Sistema pausado (no asigna tickets ni procesa) | False = Sistema activo
+SYSTEM_PAUSED = False
 
 # IMPORTANTE: Verificar que esta URL sea accesible desde el servidor
 # Si hay error de DNS, verificar:
@@ -64,6 +68,13 @@ PERSON_NAMES = {
 
 # IDs de personas asignables
 ASSIGNABLE_PERSONS = [10, 27, 37, 38]
+
+# Asignación por turnos según etiquetas en notas
+# [TT] = Turno Tarde
+TURNO_TARDE_IDS = [27, 38]  # Luis Sarco, Yaini Al
+
+# [TD] = Turno Día
+TURNO_DIA_IDS = [10, 37]  # Gabriel Romero, Cesareo Suarez
 
 # ============================================================================
 # HORARIOS DE TRABAJO
