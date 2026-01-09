@@ -102,3 +102,22 @@ def thread_end_of_shift_notifications(app):
                 "errores": 1,
                 "error": str(e)
             }
+
+def thread_auto_unassign_after_shift(app):
+    """Versión para hilos de auto_unassign_after_shift - Desasigna tickets 1 hora después del fin de turno"""
+    with app.app_context():
+        sp = SplynxServices()
+        tk = TicketManager(sp)
+        
+        try:
+            resultado = tk.auto_unassign_after_shift()
+            print(f"Desasignación automática: {resultado['tickets_desasignados']} tickets desasignados de {resultado['tickets_revisados']} revisados")
+            return resultado
+        except Exception as e:
+            print(f"Error en desasignación automática: {str(e)}")
+            return {
+                "tickets_revisados": 0,
+                "tickets_desasignados": 0,
+                "errores": 1,
+                "error": str(e)
+            }

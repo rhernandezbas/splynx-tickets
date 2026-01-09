@@ -822,6 +822,13 @@ class TicketManager:
                         # Solo incrementar el contador si la asignación fue exitosa
                         AssignmentTrackerInterface.increment_count(assigned_person_id)
                         
+                        # Registrar asignación en historial
+                        TicketResponseMetricsInterface.add_assignment_to_history(
+                            ticket_id=str(ticket_id),
+                            assigned_to=assigned_person_id,
+                            reason="auto_assignment"
+                        )
+                        
                         # Enviar notificación por WhatsApp (si está habilitado)
                         from app.utils.constants import WHATSAPP_ENABLED
                         notificacion_enviada = False
@@ -891,3 +898,113 @@ class TicketManager:
             print(f"❌ Error general en asignación de tickets: {e}")
             resultado["errores"] = resultado["total_tickets"]
             return resultado
+    
+    def auto_unassign_after_shift(self):
+        """Desasigna tickets automáticamente 1 hora después del fin de turno del operador"""
+        from app.utils.constants import OPERATOR_SCHEDULES
+        import pytz
+        from datetime import datetime
+        
+        resultado = {
+            "tickets_revisados": 0,
+            "tickets_desasignados": 0,
+            "errores": 0,
+            "detalles": []
+        }
+        
+        try:
+            # Obtener hora actual en Argentina
+            tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz_argentina)
+            current_time_minutes = now.hour * 60 + now.minute
+            
+            print(f"\n{'='*60}")
+            print(f"🔄 VERIFICANDO DESASIGNACIÓN AUTOMÁTICA")
+            print(f"⏰ Hora actual: {now.strftime('%H:%M')}")
+            print(f"{'='*60}\n")
+            
+            # Obtener todos los tickets asignados (status != 3 = no cerrados)
+            tickets = self.splynx.get_assigned_tickets()
+            
+            if not tickets:
+                print("ℹ️  No hay tickets asignados para revisar")
+                return resultado
+            
+            resultado["tickets_revisados"] = len(tickets)
+            print(f"📋 Revisando {len(tickets)} tickets asignados\n")
+            
+            for ticket in tickets:
+                ticket_id = ticket.get('id')
+                assigned_to = ticket.get('assigned_to')
+                subject = ticket.get('subject', 'Sin asunto')
+                
+                # Verificar si el operador tiene horarios definidos
+                if assigned_to not in OPERATOR_SCHEDULES:
+                    continue
+                
+                schedules = OPERATOR_SCHEDULES[assigned_to]
+                operator_name = self.get_operator_name(assigned_to)
+                
+                # Verificar si pasaron 30 minutos desde el fin de algún turno
+                should_unassign = False
+                shift_end_time = None
+                
+                for schedule in schedules:
+                    end_minutes = schedule["end_hour"] * 60 + schedule["end_minute"]
+                    minutes_after_shift = current_time_minutes - end_minutes
+                    
+                    # Si pasaron entre 60 y 90 minutos del fin de turno (1 hora después)
+                    if 60 <= minutes_after_shift <= 90:
+                        should_unassign = True
+                        shift_end_time = f"{schedule['end_hour']:02d}:{schedule['end_minute']:02d}"
+                        print(f"⏰ Operador {operator_name} (ID {assigned_to}): Turno terminó a las {shift_end_time}")
+                        print(f"   Han pasado {minutes_after_shift} minutos desde el fin de turno")
+                        break
+                
+                if should_unassign:
+                    # Desasignar ticket (assigned_to = 0 o NULL)
+                    response = self.splynx.update_ticket_assignment(ticket_id, 0)
+                    
+                    if response:
+                        resultado["tickets_desasignados"] += 1
+                        
+                        # Registrar desasignación en historial
+                        TicketResponseMetricsInterface.add_assignment_to_history(
+                            ticket_id=str(ticket_id),
+                            assigned_to=0,
+                            reason=f"auto_unassign_after_shift_end_{shift_end_time}"
+                        )
+                        
+                        print(f"   ✅ Ticket {ticket_id} desasignado de {operator_name}")
+                        
+                        resultado["detalles"].append({
+                            "ticket_id": ticket_id,
+                            "subject": subject,
+                            "previous_assigned_to": assigned_to,
+                            "operator_name": operator_name,
+                            "shift_end_time": shift_end_time,
+                            "estado": "DESASIGNADO"
+                        })
+                    else:
+                        resultado["errores"] += 1
+                        print(f"   ❌ Error al desasignar ticket {ticket_id}")
+            
+            print(f"\n{'='*60}")
+            print(f"✅ DESASIGNACIÓN AUTOMÁTICA COMPLETADA")
+            print(f"   Tickets revisados: {resultado['tickets_revisados']}")
+            print(f"   Tickets desasignados: {resultado['tickets_desasignados']}")
+            print(f"   Errores: {resultado['errores']}")
+            print(f"{'='*60}\n")
+            
+            return resultado
+            
+        except Exception as e:
+            print(f"❌ Error en desasignación automática: {e}")
+            import traceback
+            traceback.print_exc()
+            return resultado
+    
+    def get_operator_name(self, person_id: int) -> str:
+        """Obtiene el nombre del operador por su ID"""
+        from app.utils.constants import PERSON_NAMES
+        return PERSON_NAMES.get(person_id, f"Operador {person_id}")

@@ -73,6 +73,15 @@ with app.app_context():
         print(f"Info: auditorado ya existe o error: {e}")
         db.session.rollback()
     
+    # Agregar columna assignment_history si no existe
+    try:
+        db.session.execute(text("ALTER TABLE ticket_response_metrics ADD COLUMN assignment_history JSON"))
+        db.session.commit()
+        print("✅ Columna assignment_history agregada a ticket_response_metrics")
+    except Exception as e:
+        print(f"Info: assignment_history ya existe o error: {e}")
+        db.session.rollback()
+    
     # Inicializar trackers para las personas asignables
     from app.interface.interfaces import AssignmentTrackerInterface
     assignable_persons = [10, 27, 37, 38]

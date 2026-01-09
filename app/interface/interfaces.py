@@ -388,6 +388,37 @@ class TicketResponseMetricsInterface(BaseInterface):
             return False
     
     @staticmethod
+    def add_assignment_to_history(ticket_id: str, assigned_to: int, reason: str = "assigned") -> bool:
+        """Add assignment entry to history."""
+        try:
+            from datetime import datetime
+            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
+            if metric:
+                # Inicializar historial si es None o vacío
+                if metric.assignment_history is None:
+                    metric.assignment_history = []
+                
+                # Agregar nueva entrada al historial
+                assignment_entry = {
+                    "assigned_to": assigned_to,
+                    "assigned_at": datetime.now().isoformat(),
+                    "reason": reason
+                }
+                metric.assignment_history.append(assignment_entry)
+                
+                # Actualizar assigned_to actual
+                metric.assigned_to = assigned_to
+                
+                print(f"      📋 Historial actualizado: {len(metric.assignment_history)} asignaciones para ticket {ticket_id}")
+                return BaseInterface.commit_changes()
+            return False
+        except Exception as e:
+            print(f"Error adding assignment to history: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    @staticmethod
     def mark_resolved(ticket_id: str) -> bool:
         """Mark ticket as resolved."""
         try:

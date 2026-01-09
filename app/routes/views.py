@@ -4,7 +4,7 @@ import os
 import threading
 from flask import jsonify,current_app
 from app.routes import blueprint
-from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets, thread_alert_overdue_tickets, thread_end_of_shift_notifications
+from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets, thread_alert_overdue_tickets, thread_end_of_shift_notifications, thread_auto_unassign_after_shift
 
 
 def _archivos_base_dir():
@@ -191,6 +191,23 @@ def system_status():
         return jsonify({
             "success": True,
             "status": status
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/tickets/auto_unassign_after_shift", methods=["POST"])
+def auto_unassign_after_shift():
+    """Desasigna tickets automáticamente 1 hora después del fin de turno"""
+    try:
+        hilo = threading.Thread(target=thread_auto_unassign_after_shift, args=(current_app._get_current_object(),))
+        hilo.start()
+        return jsonify({
+            "success": True,
+            "message": "Verificación de desasignación automática iniciada"
         }), 200
     except Exception as e:
         return jsonify({

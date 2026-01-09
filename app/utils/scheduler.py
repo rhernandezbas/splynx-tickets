@@ -131,6 +131,15 @@ def init_scheduler(app):
         replace_existing=True
     )
     
+    # Agregar job para desasignación automática después de fin de turno (cada 40 minutos)
+    scheduler.add_job(
+        func=lambda: requests.post('http://localhost:7842/api/tickets/auto_unassign_after_shift'),
+        trigger=IntervalTrigger(minutes=40),
+        id='auto_unassign_after_shift_job',
+        name='Desasignar tickets 1 hora después del fin de turno cada 40 minutos',
+        replace_existing=True
+    )
+    
     # Iniciar el scheduler
     scheduler.start()
     _scheduler_instance = scheduler
@@ -141,6 +150,7 @@ def init_scheduler(app):
     print("   • all_flow cada 3 minutos")
     print("   • Alertas tickets vencidos cada 3 minutos")
     print("   • Notificaciones de fin de turno cada hora")
+    print("   • Desasignación automática cada 10 minutos")
     print("🌎 Zona horaria: America/Argentina/Buenos_Aires")
     print(f"🔧 PID: {os.getpid()}")
     print("="*60 + "\n")

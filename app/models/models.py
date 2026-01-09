@@ -54,6 +54,7 @@ class TicketResponseMetrics(db.Model):
     resolved_at = db.Column(db.DateTime)
     exceeded_threshold = db.Column(db.Boolean, default=True)
     auditorado = db.Column(db.Boolean, default=False)  # Campo manual para auditoría
+    assignment_history = db.Column(db.JSON, default=list)  # Historial de asignaciones [{assigned_to, assigned_at, reason}]
     
     def __repr__(self):
         return f'<TicketResponseMetrics ticket_id: {self.ticket_id}, assigned_to: {self.assigned_to}, response_time: {self.response_time_minutes}min, auditorado: {self.auditorado}>'
