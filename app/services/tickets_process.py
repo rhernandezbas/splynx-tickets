@@ -1,6 +1,6 @@
 import csv
 import os
-from app.utils.config import DEPARTAMENTOS
+from app.utils.constants import DEPARTAMENTOS
 
 # Mapeo de prioridades a formato Splynx
 PRIORITY_MAP = {

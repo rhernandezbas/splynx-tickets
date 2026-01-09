@@ -6,7 +6,7 @@ Estas funciones son versiones de las funciones de views.py que no dependen de Fl
 from app.services.splynx_services import SplynxServices
 from app.services.ticket_manager import TicketManager
 from app.services.selenium_multi_departamentos import SeleniumMultiDepartamentos
-from app.utils.config import DEPARTAMENTOS
+from app.utils.constants import DEPARTAMENTOS
 
 
 def thread_download_csv():
@@ -57,6 +57,48 @@ def thread_assign_unassigned_tickets(app):
             return {
                 "total_tickets": 0,
                 "asignados_exitosamente": 0,
+                "errores": 1,
+                "error": str(e)
+            }
+
+
+def thread_alert_overdue_tickets(app):
+    """Versión para hilos de alert_overdue_tickets - Alerta sobre tickets con más de 45 minutos"""
+    with app.app_context():
+        from app.utils.constants import TICKET_ALERT_THRESHOLD_MINUTES
+        
+        sp = SplynxServices()
+        tk = TicketManager(sp)
+        
+        try:
+            resultado = tk.check_and_alert_overdue_tickets(threshold_minutes=TICKET_ALERT_THRESHOLD_MINUTES)
+            print(f"Alertas completadas: {resultado['alertas_enviadas']} de {resultado['tickets_vencidos']} tickets vencidos")
+            return resultado
+        except Exception as e:
+            print(f"Error al alertar tickets vencidos: {str(e)}")
+            return {
+                "total_tickets_revisados": 0,
+                "tickets_vencidos": 0,
+                "alertas_enviadas": 0,
+                "errores": 1,
+                "error": str(e)
+            }
+
+def thread_end_of_shift_notifications(app):
+    """Versión para hilos de end_of_shift_notifications - Envía resumen 1 hora antes del fin de turno"""
+    with app.app_context():
+        sp = SplynxServices()
+        tk = TicketManager(sp)
+        
+        try:
+            resultado = tk.send_end_of_shift_notifications()
+            print(f"Notificaciones de fin de turno: {resultado['operadores_notificados']} operadores notificados")
+            return resultado
+        except Exception as e:
+            print(f"Error al enviar notificaciones de fin de turno: {str(e)}")
+            return {
+                "operadores_notificados": 0,
+                "total_tickets_reportados": 0,
                 "errores": 1,
                 "error": str(e)
             }

@@ -34,3 +34,25 @@ class AssignmentTracker(db.Model):
 
     def __repr__(self):
         return f'<AssignmentTracker person_id: {self.person_id}, count: {self.ticket_count}>'
+
+
+class TicketResponseMetrics(db.Model):
+    """Tracks response time metrics for tickets that exceed 45 minutes."""
+    __tablename__ = 'ticket_response_metrics'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.String(50), nullable=False, unique=True, index=True)  # UNIQUE constraint
+    assigned_to = db.Column(db.Integer, nullable=False)
+    customer_id = db.Column(db.String(100))
+    customer_name = db.Column(db.String(200))
+    subject = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, nullable=False)
+    first_alert_sent_at = db.Column(db.DateTime)
+    last_alert_sent_at = db.Column(db.DateTime)
+    response_time_minutes = db.Column(db.Integer)
+    alert_count = db.Column(db.Integer, default=0)
+    resolved_at = db.Column(db.DateTime)
+    exceeded_threshold = db.Column(db.Boolean, default=True)
+    
+    def __repr__(self):
+        return f'<TicketResponseMetrics ticket_id: {self.ticket_id}, assigned_to: {self.assigned_to}, response_time: {self.response_time_minutes}min>'

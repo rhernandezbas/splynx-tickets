@@ -144,6 +144,47 @@ class SplynxServices:
             print(f"❌ Error obteniendo tickets no asignados: {e}")
             return []
 
+    def get_assigned_tickets(self, group_id="4"):
+        """Get all assigned tickets from a specific group, excluding closed tickets
+        
+        Args:
+            group_id: Group ID to filter tickets (default "4" for Soporte Tecnico)
+            
+        Returns:
+            list: List of assigned tickets (not closed)
+        """
+        url = f"{self.base_url}/api/2.0/admin/support/tickets"
+        headers = {
+            "Authorization": f"Splynx-EA (access_token={self.token})",
+        }
+        
+        # Parámetros para filtrar tickets del grupo de Soporte
+        params = {
+            "group_id": group_id
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params, verify=self.verify_ssl)
+            response.raise_for_status()
+            all_tickets = response.json()
+            
+            # Filtrar tickets que:
+            # 1. No estén cerrados (closed != "1")
+            # 2. Tengan asignación (assign_to != 0 y != "0")
+            # 3. Pertenezcan al grupo especificado
+            filtered_tickets = [
+                ticket for ticket in all_tickets 
+                if ticket.get('closed') not in ['1', 1]
+                and ticket.get('assign_to') not in [0, '0', None, '']
+                and str(ticket.get('group_id')) == str(group_id)
+            ]
+            
+            print(f"✅ Encontrados {len(filtered_tickets)} tickets asignados (abiertos) de {len(all_tickets)} totales en grupo {group_id}")
+            return filtered_tickets
+        except requests.exceptions.RequestException as e:
+            print(f"❌ Error obteniendo tickets asignados: {e}")
+            return []
+
     def update_ticket_assignment(self, ticket_id: str, assigned_to: int):
         """Update the assignment of a ticket
         

@@ -85,6 +85,8 @@ poetry run python -m flask run --host=0.0.0.0 --port=5605
 - `POST /api/tickets/close` - Cerrar tickets
 - `POST /api/tickets/create` - Crear tickets en Splynx
 - `POST /api/tickets/all_flow` - Ejecutar flujo completo (download → create)
+- `POST /api/tickets/assign_unassigned` - Asignar tickets no asignados
+- `POST /api/tickets/alert_overdue` - Alertar sobre tickets con más de 45 minutos asignados
 
 ## Sistema de Asignación Justa
 
@@ -95,6 +97,80 @@ Los tickets se asignan automáticamente de forma equitativa entre:
 - Persona ID: 38
 
 El sistema usa un algoritmo round-robin que asigna cada ticket a la persona con menos tickets asignados.
+
+## Sistema de Alertas de WhatsApp
+
+El sistema incluye dos tipos de alertas automáticas por WhatsApp:
+
+#### 1. Alertas de Tickets Vencidos
+
+- **Umbral de alerta**: 45 minutos desde la asignación
+- **Agrupación inteligente**: Un solo mensaje por operador con todos sus tickets vencidos
+- **Mensajes personalizados**: Incluye nombre del operador y detalles de cada ticket
+- **Verificación de actualización**: No alerta si el ticket fue actualizado hace menos de 30 minutos
+- **Registro de métricas**: Guarda estadísticas en base de datos
+
+**Endpoint:**
+```bash
+POST /api/tickets/alert_overdue
+```
+
+Ver documentación completa en: [ALERTAS_WHATSAPP.md](ALERTAS_WHATSAPP.md)
+
+#### 2. Notificaciones de Fin de Turno
+
+- **Tiempo de notificación**: 1 hora antes del fin de turno
+- **Resumen completo**: Todos los tickets pendientes del operador
+- **Horarios personalizados**: Basado en turnos de cada operador
+- **Solo días laborales**: Lunes a viernes
+- **Verificación automática**: Cada hora
+
+**Endpoint:**
+```bash
+POST /api/tickets/end_of_shift_notifications
+```
+
+**Horarios configurados:**
+- Gabriel Romero (ID 10): 00:00-08:00 y 08:00-16:00
+- Luis Sarco (ID 27): 10:00-17:20
+- Cesareo Suarez (ID 37): 00:00-08:00 y 08:00-15:00
+- Yaini Al (ID 38): 17:00-23:00
+
+Ver documentación completa en: [NOTIFICACIONES_FIN_TURNO.md](NOTIFICACIONES_FIN_TURNO.md)
+
+**Configuración:**
+- Evolution API configurada en `config.py`
+- Números de WhatsApp mapeados por operador
+- Horarios de trabajo configurables
+- Tareas programadas automáticas
+
+### Configuración de Evolution API
+
+Para habilitar las alertas de WhatsApp, configura en `app/utils/config.py`:
+
+```python
+EVOLUTION_API_BASE_URL = "https://tu-api.evolution.com"
+EVOLUTION_API_KEY = "tu-api-key"
+EVOLUTION_INSTANCE_NAME = "tu-instancia"
+
+PERSON_WHATSAPP_NUMBERS = {
+    10: "5491112345678",  # Número con código de país
+    27: "5491187654321",
+    37: "5491198765432",
+    38: "5491176543210"
+}
+```
+
+### Formato de Alerta Agrupada
+
+Cada operador recibe un mensaje con todos sus tickets vencidos:
+- 🚨 Encabezado con cantidad total de tickets
+- 📋 Lista numerada de tickets con:
+  - ID del ticket
+  - 👤 Nombre del cliente
+  - 📝 Asunto (truncado a 50 caracteres)
+  - ⏱️ Tiempo transcurrido en minutos
+- ⚠️ Mensaje de acción
 
 ## Estructura del Proyecto
 
@@ -108,12 +184,14 @@ app_splynx/
 │   │   └── interfaces.py      # Interfaces CRUD
 │   ├── services/
 │   │   ├── splynx_services.py # API Splynx
-│   │   └── ticket_manager.py  # Lógica de tickets
+│   │   ├── ticket_manager.py  # Lógica de tickets
+│   │   └── evolution_api.py   # API Evolution (WhatsApp)
 │   ├── routes/
 │   │   ├── views.py           # Endpoints
 │   │   └── thread_functions.py
 │   └── utils/
-│       └── config.py          # Configuración
+│       ├── config.py          # Configuración
+│       └── scheduler.py       # Tareas programadas
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml

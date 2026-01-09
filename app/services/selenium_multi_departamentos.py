@@ -10,7 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.service import Service
-from app.utils.config import USUARIO, CONTRASENA, LOGIN_URL, CASOS_URL, DEPARTAMENTOS_selenium
+from app.utils.constants import USUARIO, CONTRASENA, LOGIN_URL, CASOS_URL, DEPARTAMENTOS_SELENIUM
 from app.interface.interfaces import IncidentsInterface
 from flask import current_app
 from app import create_app
@@ -19,7 +19,7 @@ from app import create_app
 class SeleniumMultiDepartamentos:
     def __init__(self):
         """Inicializar el sistema multi-departamental"""
-        self.departamentos = DEPARTAMENTOS_selenium
+        self.departamentos = DEPARTAMENTOS_SELENIUM
 
     @staticmethod
     def setup_chrome_driver(dept_key:str):

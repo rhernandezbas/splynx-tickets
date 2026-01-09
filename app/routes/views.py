@@ -4,7 +4,7 @@ import os
 import threading
 from flask import jsonify,current_app
 from app.routes import blueprint
-from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets
+from app.routes.thread_functions import thread_download_csv, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets, thread_alert_overdue_tickets, thread_end_of_shift_notifications
 
 
 def _archivos_base_dir():
@@ -90,6 +90,39 @@ def assign_unassigned():
         return jsonify({
             "success": True,
             "message": "Asignación de tickets no asignados iniciada"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/tickets/alert_overdue", methods=["POST"])
+def alert_overdue_tickets():
+    """Alerta sobre tickets asignados que superen 45 minutos sin respuesta"""
+    try:
+        hilo = threading.Thread(target=thread_alert_overdue_tickets, args=(current_app._get_current_object(),))
+        hilo.start()
+        return jsonify({
+            "success": True,
+            "message": "Verificación de tickets vencidos iniciada"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@blueprint.route("/api/tickets/end_of_shift_notifications", methods=["POST"])
+def end_of_shift_notifications():
+    """Envía notificaciones de resumen 1 hora antes del fin de turno"""
+    try:
+        hilo = threading.Thread(target=thread_end_of_shift_notifications, args=(current_app._get_current_object(),))
+        hilo.start()
+        return jsonify({
+            "success": True,
+            "message": "Verificación de notificaciones de fin de turno iniciada"
         }), 200
     except Exception as e:
         return jsonify({

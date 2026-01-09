@@ -113,13 +113,24 @@ def init_scheduler(app):
         replace_existing=True
     )
     
+    # Agregar job para notificaciones de fin de turno (cada hora)
+    scheduler.add_job(
+        func=lambda: requests.post('http://localhost:7842/api/tickets/end_of_shift_notifications'),
+        trigger=IntervalTrigger(hours=1),
+        id='end_of_shift_notifications_job',
+        name='Verificar notificaciones de fin de turno cada hora',
+        replace_existing=True
+    )
+    
     # Iniciar el scheduler
     scheduler.start()
     _scheduler_instance = scheduler
     
     print("\n" + "="*60)
     print("⏰ SCHEDULER INICIADO")
-    print("📋 Tarea: Ejecutar all_flow cada 3 minutos")
+    print("📋 Tareas programadas:")
+    print("   • all_flow cada 3 minutos")
+    print("   • Notificaciones de fin de turno cada hora")
     print("🌎 Zona horaria: America/Argentina/Buenos_Aires")
     print(f"🔧 PID: {os.getpid()}")
     print("="*60 + "\n")

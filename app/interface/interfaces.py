@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Union
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils.config import db
-from app.models.models import IncidentsDetection, AssignmentTracker
+from app.models.models import IncidentsDetection, AssignmentTracker, TicketResponseMetrics
 
 
 class BaseInterface:
@@ -302,3 +302,88 @@ class AssignmentTrackerInterface(BaseInterface):
         except Exception as e:
             print(f"Error resetting counts: {str(e)}")
             return False
+
+
+class TicketResponseMetricsInterface(BaseInterface):
+    """Interface for TicketResponseMetrics model."""
+    
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[TicketResponseMetrics]:
+        """Create a new ticket response metric."""
+        try:
+            from datetime import datetime
+            metric = TicketResponseMetrics(
+                ticket_id=data.get('ticket_id'),
+                assigned_to=data.get('assigned_to'),
+                customer_id=data.get('customer_id'),
+                customer_name=data.get('customer_name'),
+                subject=data.get('subject'),
+                created_at=data.get('created_at'),
+                first_alert_sent_at=data.get('first_alert_sent_at'),
+                last_alert_sent_at=data.get('last_alert_sent_at'),
+                response_time_minutes=data.get('response_time_minutes'),
+                alert_count=data.get('alert_count', 0),
+                resolved_at=data.get('resolved_at'),
+                exceeded_threshold=data.get('exceeded_threshold', True)
+            )
+            if BaseInterface.add_item(metric):
+                return metric
+            return None
+        except Exception as e:
+            print(f"Error creating ticket metric: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_ticket_id(ticket_id: str) -> Optional[TicketResponseMetrics]:
+        """Get metric by ticket ID."""
+        try:
+            return TicketResponseMetrics.query.filter_by(ticket_id=ticket_id).first()
+        except SQLAlchemyError as e:
+            print(f"Error getting metric by ticket ID: {str(e)}")
+            return None
+    
+    @staticmethod
+    def update_alert_sent(ticket_id: str, response_time_minutes: int) -> bool:
+        """Update alert sent timestamp and increment alert count."""
+        try:
+            from datetime import datetime
+            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
+            if metric:
+                metric.last_alert_sent_at = datetime.now()
+                metric.alert_count += 1
+                metric.response_time_minutes = response_time_minutes
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            print(f"Error updating alert sent: {str(e)}")
+            return False
+    
+    @staticmethod
+    def mark_resolved(ticket_id: str) -> bool:
+        """Mark ticket as resolved."""
+        try:
+            from datetime import datetime
+            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
+            if metric:
+                metric.resolved_at = datetime.now()
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            print(f"Error marking ticket as resolved: {str(e)}")
+            return False
+    
+    @staticmethod
+    def get_metrics_by_person(person_id: int) -> List[TicketResponseMetrics]:
+        """Get all metrics for a specific person."""
+        try:
+            return TicketResponseMetrics.query.filter_by(assigned_to=person_id).all()
+        except SQLAlchemyError as e:
+            print(f"Error getting metrics by person: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_unresolved_metrics() -> List[TicketResponseMetrics]:
+        """Get all unresolved ticket metrics."""
+        try:
+            return TicketResponseMetrics.query.filter_by(resolved_at=None).all()
+        except SQLAlchemyError as e:
+            print(f"Error getting unresolved metrics: {str(e)}")
+            return []

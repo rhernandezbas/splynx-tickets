@@ -35,10 +35,34 @@ with app.app_context():
     except Exception as e:
         print(f"Info: Cliente_Nombre ya existe o error: {e}")
         db.session.rollback()
-        
+    
     # Crear o actualizar todas las tablas basadas en los modelos
+    # Esto creará automáticamente la tabla ticket_response_metrics si no existe
     db.create_all()
     print("Database tables created/updated successfully!")
+    print("✅ Tabla ticket_response_metrics creada para métricas de tiempo de respuesta")
+    
+    # Agregar constraint UNIQUE a ticket_id si no existe
+    try:
+        # Verificar si el constraint ya existe
+        result = db.session.execute(text("""
+            SELECT COUNT(*) 
+            FROM information_schema.table_constraints 
+            WHERE table_name = 'ticket_response_metrics' 
+            AND constraint_type = 'UNIQUE' 
+            AND constraint_name LIKE '%ticket_id%'
+        """))
+        constraint_exists = result.scalar() > 0
+        
+        if not constraint_exists:
+            db.session.execute(text("ALTER TABLE ticket_response_metrics ADD UNIQUE (ticket_id)"))
+            db.session.commit()
+            print("✅ Constraint UNIQUE agregado a ticket_id en ticket_response_metrics")
+        else:
+            print("ℹ️  Constraint UNIQUE ya existe en ticket_id")
+    except Exception as e:
+        print(f"Info: Error al agregar constraint UNIQUE (puede que ya exista): {e}")
+        db.session.rollback()
     
     # Inicializar trackers para las personas asignables
     from app.interface.interfaces import AssignmentTrackerInterface
