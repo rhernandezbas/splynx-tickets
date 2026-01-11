@@ -51,6 +51,9 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copiar el código de la aplicación
 COPY --chown=appuser:appuser . .
 
+# Crear directorio de logs con permisos correctos
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+
 # Cambiar al usuario no-root
 USER appuser
 
