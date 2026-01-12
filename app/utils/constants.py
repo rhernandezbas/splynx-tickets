@@ -131,6 +131,14 @@ TICKET_RENOTIFICATION_INTERVAL_MINUTES = 45
 END_OF_SHIFT_NOTIFICATION_MINUTES = 60  # 1 hora antes
 
 # ============================================================================
+# CONFIGURACIÓN DE ESTADOS DE TICKETS
+# ============================================================================
+
+# Estado "OutHouse" - tickets en este estado no alertan por 2 horas
+OUTHOUSE_STATUS_ID = "6"
+OUTHOUSE_NO_ALERT_MINUTES = 120  # 2 horas
+
+# ============================================================================
 # CONFIGURACIÓN DE SPLYNX
 # ============================================================================
 

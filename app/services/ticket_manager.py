@@ -444,6 +444,7 @@ class TicketManager:
                 assigned_to = int(ticket.get('assign_to', 0))
                 created_at_str = ticket.get('created_at', '')
                 updated_at_str = ticket.get('updated_at', '')
+                status_id = str(ticket.get('status_id', ''))
                 
                 try:
                     # Parsear fecha de creación del ticket
@@ -471,6 +472,13 @@ class TicketManager:
                     # Calcular tiempo desde última actualización hasta ahora
                     time_since_update = now - updated_at
                     minutes_since_update = int(time_since_update.total_seconds() / 60)
+                    
+                    # Verificar si el ticket está en estado OutHouse (ID 6)
+                    from app.utils.constants import OUTHOUSE_STATUS_ID, OUTHOUSE_NO_ALERT_MINUTES
+                    if status_id == OUTHOUSE_STATUS_ID:
+                        if minutes_since_update < OUTHOUSE_NO_ALERT_MINUTES:
+                            logger.info(f"🏠 Ticket {ticket_id} en estado OutHouse - No se alerta hasta 2 horas ({minutes_since_update} min transcurridos)")
+                            continue
                     
                     # Verificar si supera el umbral de 45 minutos desde creación hasta última actualización
                     if minutes_elapsed >= threshold_minutes:
