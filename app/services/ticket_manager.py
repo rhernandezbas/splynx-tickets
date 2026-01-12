@@ -94,7 +94,7 @@ class TicketManager:
         # ID 10: 8:00 AM (480) - 4:00 PM (960)
         # ID 27: 10:00 AM (600) - 5:20 PM (1040)
         # ID 37: 8:00 AM (480) - 3:00 PM (900)
-        # ID 38: 5:00 PM (1020) - 11:00 PM (1380)
+        # ID 38: 4:00 PM (960) - 11:00 PM (1380)
         
         available_persons = []
         
@@ -108,7 +108,7 @@ class TicketManager:
         if 600 <= current_time_minutes < 1040:  # 10:00 AM - 5:20 PM
             available_persons.append(27)
         
-        if 1020 <= current_time_minutes <= 1380:  # 5:00 PM - 11:00 PM
+        if 960 <= current_time_minutes <= 1380:  # 4:00 PM - 11:00 PM
             available_persons.append(38)
         
         # Si no hay nadie disponible, usar fallback (round-robin entre todos)
