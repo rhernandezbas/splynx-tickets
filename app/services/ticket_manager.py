@@ -451,28 +451,35 @@ class TicketManager:
                     created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
                     created_at = tz_argentina.localize(created_at)
                     
-                    # Calcular tiempo transcurrido desde creación
-                    time_elapsed = now - created_at
+                    # Parsear fecha de última actualización
+                    if updated_at_str:
+                        try:
+                            updated_at = datetime.strptime(updated_at_str, '%Y-%m-%d %H:%M:%S')
+                            updated_at = tz_argentina.localize(updated_at)
+                        except ValueError:
+                            # Si hay error parseando updated_at, usar now
+                            logger.warning(f"⚠️  Error parseando updated_at para ticket {ticket_id}, usando now")
+                            updated_at = now
+                    else:
+                        # Si no hay updated_at, usar now
+                        updated_at = now
+                    
+                    # Calcular tiempo transcurrido desde creación hasta última actualización
+                    time_elapsed = updated_at - created_at
                     minutes_elapsed = int(time_elapsed.total_seconds() / 60)
                     
-                    # Verificar si supera el umbral de 45 minutos desde creación
+                    # Calcular tiempo desde última actualización hasta ahora
+                    time_since_update = now - updated_at
+                    minutes_since_update = int(time_since_update.total_seconds() / 60)
+                    
+                    # Verificar si supera el umbral de 45 minutos desde creación hasta última actualización
                     if minutes_elapsed >= threshold_minutes:
                         
-                        # Verificar updated_at - si fue actualizado hace menos de 30 minutos, NO alertar
+                        # Si fue actualizado hace menos de 30 minutos, NO alertar
                         should_alert = True
-                        if updated_at_str:
-                            try:
-                                updated_at = datetime.strptime(updated_at_str, '%Y-%m-%d %H:%M:%S')
-                                updated_at = tz_argentina.localize(updated_at)
-                                time_since_update = now - updated_at
-                                minutes_since_update = int(time_since_update.total_seconds() / 60)
-                                
-                                if minutes_since_update < TICKET_UPDATE_THRESHOLD_MINUTES:
-                                    should_alert = False
-                                    logger.info(f"⏭️  Ticket {ticket_id} actualizado hace {minutes_since_update} min - NO se alerta")
-                            except ValueError:
-                                # Si hay error parseando updated_at, alertar de todas formas
-                                logger.warning(f"⚠️  Error parseando updated_at para ticket {ticket_id}, se procederá con alerta")
+                        if minutes_since_update < TICKET_UPDATE_THRESHOLD_MINUTES:
+                            should_alert = False
+                            logger.info(f"⏭️  Ticket {ticket_id} actualizado hace {minutes_since_update} min - NO se alerta")
                         
                         if not should_alert:
                             continue
