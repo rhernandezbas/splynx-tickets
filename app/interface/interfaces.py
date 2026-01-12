@@ -352,8 +352,11 @@ class TicketResponseMetricsInterface(BaseInterface):
         """Update alert sent timestamp and increment alert count. Creates metric if doesn't exist."""
         try:
             from datetime import datetime
+            import pytz
             metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
-            now = datetime.now()
+            # Usar timezone de Argentina para evitar problemas de comparación
+            tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+            now = datetime.now(tz_argentina)
             
             if metric:
                 # Actualizar métrica existente
