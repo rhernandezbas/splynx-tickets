@@ -278,7 +278,7 @@ class TicketManager:
         for ticket_data in data["pending_tickets"]:
             cliente = ticket_data.get("Cliente", "")
             cliente_nombre = ticket_data.get("Cliente_Nombre", "")  # Obtener nombre desde la BD
-            asunto = ticket_data.get("Asunto", "")
+            asunto_original = ticket_data.get("Asunto", "")  # Guardar asunto original para búsquedas en BD
             fecha_creacion = ticket_data.get("Fecha_Creacion", "")
 
             assigned_person_id = self.assign_ticket_fairly()
@@ -287,13 +287,15 @@ class TicketManager:
             customer_name = cliente_nombre if cliente_nombre else "Cliente"
             logger.info(f"✅ Nombre del cliente: {customer_name}")
             
-            # Agregar prefijo 'GR' a tickets que vienen de Gestion Real
-            if asunto.startswith("Ticket-"):
-                asunto = f"GR {asunto}"
+            # Agregar prefijo 'GR' a tickets que vienen de Gestion Real (solo para Splynx)
+            asunto_splynx = asunto_original
+            if asunto_original.startswith("Ticket-"):
+                asunto_splynx = f"GR {asunto_original}"
             
             ticket_data = {
                 "Cliente": cliente,
-                "Asunto": asunto,
+                "Asunto": asunto_splynx,  # Usar asunto con prefijo para Splynx
+                "Asunto_Original": asunto_original,  # Guardar original para búsquedas en BD
                 "note": f"Ticket creado automaticamente por Api Splynx para el cliente {customer_name}, con fecha original de {fecha_creacion}",
                 "Fecha_Creacion": fecha_creacion,
                 "Prioridad": ticket_data.get("Prioridad", "medium"),
@@ -315,10 +317,10 @@ class TicketManager:
                 ticket_id = str(response['id'])
                 created_tickets.append(ticket_id)  # Agregar el ID a la lista de tickets creados
 
-                # Actualizar el registro en la base de datos
+                # Actualizar el registro en la base de datos (usar asunto original)
                 self._update_ticket_id_in_db(
                     customer_id=ticket_data["Cliente"],
-                    subject=ticket_data["Asunto"],
+                    subject=ticket_data["Asunto_Original"],
                     fecha_creacion=ticket_data["Fecha_Creacion"],
                     ticket_id=ticket_id
                 )
@@ -349,13 +351,13 @@ class TicketManager:
                     else:
                         logger.error(f"❌ Error enviando notificación: {notif_resultado.get('error', 'Unknown')}")
                 
-                # Actualizar assigned_to en la base de datos
+                # Actualizar assigned_to en la base de datos (usar asunto original)
                 from app.interface.interfaces import IncidentsInterface
                 try:
                     incidents = IncidentsInterface.get_all()
                     for incident in incidents:
                         if (incident.Cliente == cliente and
-                                incident.Asunto == asunto and
+                                incident.Asunto == asunto_original and
                                 incident.Fecha_Creacion == fecha_creacion):
                             update_data = {"assigned_to": assigned_person_id}
                             IncidentsInterface.update(incident.id, update_data)
@@ -364,12 +366,12 @@ class TicketManager:
                 except Exception as e:
                     logger.error(f"Error al actualizar assigned_to: {e}")
 
-                # Actualizar el estado is_created_splynx a True
+                # Actualizar el estado is_created_splynx a True (usar asunto original)
                 try:
                     incidents = IncidentsInterface.get_all()
                     for incident in incidents:
                         if (incident.Cliente == cliente and
-                                incident.Asunto == asunto and
+                                incident.Asunto == asunto_original and
                                 incident.Fecha_Creacion == fecha_creacion):
                             update_data = {"is_created_splynx": True}
                             IncidentsInterface.update(incident.id, update_data)
@@ -506,10 +508,17 @@ class TicketManager:
                             last_alert = existing_metric.last_alert_sent_at
                             if last_alert.tzinfo is None:
                                 last_alert = tz_argentina.localize(last_alert)
+                            else:
+                                # Convertir a timezone de Argentina si tiene otro timezone
+                                last_alert = last_alert.astimezone(tz_argentina)
                             
                             minutes_since_last_alert = (now - last_alert).total_seconds() / 60
                             
-                            if minutes_since_last_alert < TICKET_RENOTIFICATION_INTERVAL_MINUTES:
+                            # Si el tiempo es negativo, significa que hay un problema de timezone - alertar de todos modos
+                            if minutes_since_last_alert < 0:
+                                logger.warning(f"⚠️  Ticket {ticket_id} tiene last_alert en el futuro ({int(minutes_since_last_alert)} min) - forzando alerta")
+                                should_notify = True
+                            elif minutes_since_last_alert < TICKET_RENOTIFICATION_INTERVAL_MINUTES:
                                 should_notify = False
                                 logger.info(f"⏭️  Ticket {ticket_id} ya fue notificado hace {int(minutes_since_last_alert)} min - omitiendo")
                                 resultado["detalles"].append({
