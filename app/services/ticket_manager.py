@@ -475,7 +475,7 @@ class TicketManager:
                     # Verificar si supera el umbral de 45 minutos desde creación hasta última actualización
                     if minutes_elapsed >= threshold_minutes:
                         
-                        # Si fue actualizado hace menos de 30 minutos, NO alertar
+                        # Si fue actualizado hace menos de 45 minutos, NO alertar
                         should_alert = True
                         if minutes_since_update < TICKET_UPDATE_THRESHOLD_MINUTES:
                             should_alert = False

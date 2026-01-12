@@ -121,7 +121,7 @@ TICKET_ALERT_THRESHOLD_MINUTES = 45
 
 # Tiempo mínimo desde última actualización para enviar alerta (en minutos)
 # Si el ticket fue actualizado hace menos de este tiempo, no se envía alerta
-TICKET_UPDATE_THRESHOLD_MINUTES = 30
+TICKET_UPDATE_THRESHOLD_MINUTES = 45
 
 # Intervalo mínimo entre notificaciones del mismo ticket (en minutos)
 # No se volverá a notificar un ticket si ya fue notificado hace menos de este tiempo
