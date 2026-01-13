@@ -117,15 +117,15 @@ OPERATOR_SCHEDULES = {
 # ============================================================================
 
 # Tiempo límite en minutos para alertar sobre tickets asignados
-TICKET_ALERT_THRESHOLD_MINUTES = 45
+TICKET_ALERT_THRESHOLD_MINUTES = 60
 
 # Tiempo mínimo desde última actualización para enviar alerta (en minutos)
 # Si el ticket fue actualizado hace menos de este tiempo, no se envía alerta
-TICKET_UPDATE_THRESHOLD_MINUTES = 45
+TICKET_UPDATE_THRESHOLD_MINUTES = 60
 
 # Intervalo mínimo entre notificaciones del mismo ticket (en minutos)
 # No se volverá a notificar un ticket si ya fue notificado hace menos de este tiempo
-TICKET_RENOTIFICATION_INTERVAL_MINUTES = 45
+TICKET_RENOTIFICATION_INTERVAL_MINUTES = 60
 
 # Minutos antes del fin de turno para enviar notificación de resumen
 END_OF_SHIFT_NOTIFICATION_MINUTES = 60  # 1 hora antes
