@@ -42,12 +42,13 @@ export default function SchedulesEditable() {
     fetchOperators()
   }, [])
 
-  const handleAddSchedule = (personId) => {
+  const handleAddSchedule = (personId, scheduleType = 'work') => {
     setNewSchedule({
       person_id: personId,
       day_of_week: 0,
       start_time: '09:00',
       end_time: '17:00',
+      schedule_type: scheduleType,
       is_active: true
     })
   }
