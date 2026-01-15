@@ -881,7 +881,6 @@ def get_metrics():
 def get_incidents():
     """Get all incidents/tickets with optional filters."""
     try:
-        from app.interface.interfaces import IncidentsDetectionInterface
         from app.models.models import IncidentsDetection
         
         # Obtener parámetros de filtro
