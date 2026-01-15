@@ -66,6 +66,7 @@ def get_operators():
                 'whatsapp_number': op.whatsapp_number,
                 'is_active': op.is_active,
                 'is_paused': op.is_paused,
+                'assignment_paused': op.assignment_paused,
                 'paused_reason': op.paused_reason,
                 'paused_at': op.paused_at.isoformat() if op.paused_at else None,
                 'paused_by': op.paused_by,

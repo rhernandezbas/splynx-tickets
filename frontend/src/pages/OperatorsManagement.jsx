@@ -74,20 +74,29 @@ export default function OperatorsManagement() {
 
   const handleSaveConfig = async () => {
     try {
-      await adminApi.updateOperatorConfig(editingOperator.person_id, {
+      console.log('💾 Guardando configuración:', configForm)
+      const response = await adminApi.updateOperatorConfig(editingOperator.person_id, {
         ...configForm,
         paused_by: 'admin'
       })
+      console.log('✅ Respuesta del servidor:', response.data)
+      
       toast({
         title: 'Configuración Actualizada',
         description: `Configuración de ${editingOperator.name} actualizada exitosamente`
       })
+      
       setConfigDialogOpen(false)
-      fetchOperators()
+      
+      // Esperar un momento antes de recargar para asegurar que el backend procesó el cambio
+      setTimeout(() => {
+        fetchOperators()
+      }, 500)
     } catch (error) {
+      console.error('❌ Error al actualizar:', error)
       toast({
         title: 'Error',
-        description: 'Error al actualizar configuración',
+        description: error.response?.data?.error || 'Error al actualizar configuración',
         variant: 'destructive'
       })
     }
