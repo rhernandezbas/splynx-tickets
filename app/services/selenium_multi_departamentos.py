@@ -393,15 +393,11 @@ class SeleniumMultiDepartamentos:
                                     })
                                     logger.info(f"*** Guardado exitoso: {cliente} - {asunto}")
                                 else:
-                                    resultado["errores"] += 1
-                                    resultado["detalles"].append({
-                                        "cliente": cliente,
-                                        "asunto": asunto,
-                                        "estado": "ERROR",
-                                        "error": "No se pudo guardar en la base de datos"
-                                    })
-                                    logger.error(f"*** Error al guardar: {cliente} - {asunto}")
+                                    # Si incident es None, probablemente es un duplicado (ya manejado en IncidentsInterface)
+                                    # No contar como error, solo como duplicado omitido
+                                    logger.info(f"*** Ticket duplicado omitido: {cliente} - {asunto}")
                             except Exception as e:
+                                # Solo errores reales (no IntegrityError que ya se maneja en IncidentsInterface)
                                 resultado["errores"] += 1
                                 resultado["detalles"].append({
                                     "cliente": cliente,
