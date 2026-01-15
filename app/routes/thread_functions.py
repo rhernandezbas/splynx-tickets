@@ -65,15 +65,14 @@ def thread_assign_unassigned_tickets(app):
 
 
 def thread_alert_overdue_tickets(app):
-    """Versión para hilos de alert_overdue_tickets - Alerta sobre tickets con más de 45 minutos"""
+    """Versión para hilos de alert_overdue_tickets - Alerta sobre tickets vencidos (umbral configurable en BD)"""
     with app.app_context():
-        from app.utils.constants import TICKET_ALERT_THRESHOLD_MINUTES
-        
         sp = SplynxServices()
         tk = TicketManager(sp)
         
         try:
-            resultado = tk.check_and_alert_overdue_tickets(threshold_minutes=TICKET_ALERT_THRESHOLD_MINUTES)
+            # No pasar threshold_minutes para que se lea desde BD
+            resultado = tk.check_and_alert_overdue_tickets()
             logger.info(f"Alertas completadas: {resultado['alertas_enviadas']} de {resultado['tickets_vencidos']} tickets vencidos")
             return resultado
         except Exception as e:

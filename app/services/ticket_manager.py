@@ -8,6 +8,7 @@ from app.services.splynx_services import SplynxServices
 from app.services.whatsapp_service import WhatsAppService
 from app.interface.interfaces import TicketResponseMetricsInterface
 from app.utils.schedule_helper import ScheduleHelper
+from app.utils.config_helper import ConfigHelper
 from datetime import datetime
 import pytz
 from app.utils.logger import get_logger
@@ -359,25 +360,30 @@ class TicketManager:
         # Retornar la lista de tickets creados al final de la función
         return created_tickets if created_tickets else None
 
-    def check_and_alert_overdue_tickets(self, threshold_minutes=45):
+    def check_and_alert_overdue_tickets(self, threshold_minutes=None):
         """Verifica tickets asignados que superen el tiempo límite y envía alertas por WhatsApp
         Agrupa todos los tickets vencidos por operador y envía un solo mensaje con la lista completa
         
         Lógica:
-        - Solo alerta si el ticket tiene más de 45 minutos desde creación
-        - NO alerta si el ticket fue actualizado hace menos de 30 minutos
+        - Solo alerta si el ticket tiene más de X minutos desde creación (configurable)
+        - NO alerta si el ticket fue actualizado hace menos de X minutos (configurable)
         - Registra métricas en la base de datos
         - Usa nombres de operadores en los mensajes
         
         Args:
-            threshold_minutes: Tiempo límite en minutos (default 45)
+            threshold_minutes: Tiempo límite en minutos (si es None, lee de BD)
             
         Returns:
             dict: Resumen de la operación con estadísticas
         """
+        # Leer configuración desde BD si no se especifica
+        if threshold_minutes is None:
+            threshold_minutes = ConfigHelper.get_ticket_alert_threshold()
+        
+        TICKET_UPDATE_THRESHOLD_MINUTES = ConfigHelper.get_ticket_update_threshold()
+        TICKET_RENOTIFICATION_INTERVAL_MINUTES = ConfigHelper.get_renotification_interval()
+        
         from app.utils.constants import (
-            TICKET_UPDATE_THRESHOLD_MINUTES,
-            TICKET_RENOTIFICATION_INTERVAL_MINUTES,
             SPLYNX_SUPPORT_GROUP_ID,
             TIMEZONE
         )
@@ -456,10 +462,11 @@ class TicketManager:
                     minutes_since_update = int(time_since_update.total_seconds() / 60)
                     
                     # Verificar si el ticket está en estado OutHouse (ID 6)
-                    from app.utils.constants import OUTHOUSE_STATUS_ID, OUTHOUSE_NO_ALERT_MINUTES
+                    from app.utils.constants import OUTHOUSE_STATUS_ID
+                    OUTHOUSE_NO_ALERT_MINUTES = ConfigHelper.get_outhouse_no_alert_minutes()
                     if status_id == OUTHOUSE_STATUS_ID:
                         if minutes_since_update < OUTHOUSE_NO_ALERT_MINUTES:
-                            logger.info(f"🏠 Ticket {ticket_id} en estado OutHouse - No se alerta hasta 2 horas ({minutes_since_update} min transcurridos)")
+                            logger.info(f"🏠 Ticket {ticket_id} en estado OutHouse - No se alerta hasta {OUTHOUSE_NO_ALERT_MINUTES} minutos ({minutes_since_update} min transcurridos)")
                             continue
                     
                     # Verificar si supera el umbral de 45 minutos desde creación hasta última actualización
