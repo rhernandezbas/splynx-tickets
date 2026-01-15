@@ -7,6 +7,7 @@ import Configuration from './pages/Configuration'
 import AuditLogs from './pages/AuditLogs'
 import Messages from './pages/Messages'
 import Metrics from './pages/Metrics'
+import Users from './pages/Users'
 import OperatorView from './pages/OperatorView'
 import Login from './pages/Login'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
@@ -35,6 +36,7 @@ function App() {
           <Route path="configuration" element={<Configuration />} />
           <Route path="messages" element={<Messages />} />
           <Route path="metrics" element={<Metrics />} />
+          <Route path="users" element={<Users />} />
           <Route path="audit" element={<AuditLogs />} />
         </Route>
 

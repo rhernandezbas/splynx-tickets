@@ -9,7 +9,8 @@ import {
   Menu,
   X,
   BarChart3,
-  LogOut
+  LogOut,
+  UserCog
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Horarios', href: '/schedules', icon: Clock },
   { name: 'Mensajes', href: '/messages', icon: MessageSquare },
   { name: 'Métricas', href: '/metrics', icon: BarChart3 },
+  { name: 'Usuarios', href: '/users', icon: UserCog },
   { name: 'Configuración', href: '/configuration', icon: Settings },
   { name: 'Auditoría', href: '/audit', icon: FileText },
 ]
