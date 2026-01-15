@@ -809,29 +809,36 @@ def get_metrics():
     try:
         from app.models.models import IncidentsDetection
         
-        # Obtener estadísticas generales
+        # Obtener estadísticas generales de tickets_detection
         total_tickets = IncidentsDetection.query.count()
+        
+        # Estados en la BD son: SUCCESS, FAIL, etc.
         open_tickets = IncidentsDetection.query.filter(
-            IncidentsDetection.Estado.in_(['Open', 'Abierto', 'New', 'Nuevo'])
+            IncidentsDetection.Estado.in_(['FAIL', 'PENDING', 'OPEN'])
         ).count()
         closed_tickets = IncidentsDetection.query.filter(
-            IncidentsDetection.Estado.in_(['Closed', 'Cerrado', 'Resolved', 'Resuelto'])
+            IncidentsDetection.Estado == 'SUCCESS'
         ).count()
         in_progress_tickets = IncidentsDetection.query.filter(
-            IncidentsDetection.Estado.in_(['In Progress', 'En Progreso', 'Working', 'Trabajando'])
+            IncidentsDetection.Estado.in_(['IN_PROGRESS', 'WORKING'])
         ).count()
         
-        # Calcular tiempo promedio de respuesta
+        # Calcular tiempo promedio de respuesta desde ticket_response_metrics
         avg_response = db.session.query(func.avg(TicketResponseMetrics.response_time_minutes)).filter(
             TicketResponseMetrics.response_time_minutes.isnot(None)
         ).scalar()
+        
+        # Tickets que excedieron el umbral (para SLA)
+        overdue_tickets = TicketResponseMetrics.query.filter(
+            TicketResponseMetrics.exceeded_threshold == True
+        ).count()
         
         # Distribución por operador - obtener nombres de operadores
         from app.interface.interfaces import OperatorConfigInterface
         operators = OperatorConfigInterface.get_all()
         operator_map = {op.person_id: op.name for op in operators}
         
-        # Distribución por operador
+        # Distribución por operador con SLA
         operator_stats = db.session.query(
             IncidentsDetection.assigned_to,
             func.count(IncidentsDetection.id).label('assigned')
@@ -843,17 +850,31 @@ def get_metrics():
         
         operator_distribution = []
         for stat in operator_stats:
-            # Contar tickets completados por operador
+            # Contar tickets completados (SUCCESS)
             completed = IncidentsDetection.query.filter(
                 IncidentsDetection.assigned_to == stat.assigned_to,
-                IncidentsDetection.Estado.in_(['Closed', 'Cerrado', 'Resolved', 'Resuelto'])
+                IncidentsDetection.Estado == 'SUCCESS'
             ).count()
+            
+            # Calcular SLA: tickets que NO excedieron el umbral
+            total_operator_tickets = stat.assigned
+            exceeded = TicketResponseMetrics.query.join(
+                IncidentsDetection, TicketResponseMetrics.ticket_id == IncidentsDetection.Ticket_ID
+            ).filter(
+                IncidentsDetection.assigned_to == stat.assigned_to,
+                TicketResponseMetrics.exceeded_threshold == True
+            ).count()
+            
+            # SLA = (total - excedidos) / total * 100
+            sla_percentage = ((total_operator_tickets - exceeded) / total_operator_tickets * 100) if total_operator_tickets > 0 else 100
             
             operator_distribution.append({
                 'person_id': stat.assigned_to,
                 'name': operator_map.get(stat.assigned_to, f'Operador {stat.assigned_to}'),
                 'assigned': stat.assigned,
-                'completed': completed
+                'completed': completed,
+                'exceeded_threshold': exceeded,
+                'sla_percentage': round(sla_percentage, 2)
             })
         
         return jsonify({
@@ -863,7 +884,7 @@ def get_metrics():
                 'open_tickets': open_tickets,
                 'closed_tickets': closed_tickets,
                 'in_progress_tickets': in_progress_tickets,
-                'overdue_tickets': 0,  # Calcular si es necesario
+                'overdue_tickets': overdue_tickets,
                 'average_response_time': round(avg_response, 2) if avg_response else 0,
                 'operator_distribution': operator_distribution
             }

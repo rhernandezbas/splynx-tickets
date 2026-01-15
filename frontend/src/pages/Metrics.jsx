@@ -306,6 +306,7 @@ export default function Metrics() {
                 <Legend />
                 <Bar dataKey="assigned" fill="#0088FE" name="Asignados" />
                 <Bar dataKey="completed" fill="#00C49F" name="Completados" />
+                <Bar dataKey="exceeded_threshold" fill="#FF8042" name="Vencidos" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -340,6 +341,58 @@ export default function Metrics() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tabla de SLA por Operador */}
+      <Card>
+        <CardHeader>
+          <CardTitle>SLA por Operador</CardTitle>
+          <CardDescription>
+            Porcentaje de cumplimiento de tiempo de respuesta por operador
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2 font-medium">Operador</th>
+                  <th className="text-left p-2 font-medium">Total Tickets</th>
+                  <th className="text-left p-2 font-medium">Completados</th>
+                  <th className="text-left p-2 font-medium">Vencidos</th>
+                  <th className="text-left p-2 font-medium">SLA %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {operatorData.map((operator) => (
+                  <tr key={operator.person_id} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{operator.name}</td>
+                    <td className="p-2">{operator.assigned}</td>
+                    <td className="p-2 text-green-600">{operator.completed}</td>
+                    <td className="p-2 text-red-600">{operator.exceeded_threshold || 0}</td>
+                    <td className="p-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full ${
+                              operator.sla_percentage >= 95 ? 'bg-green-500' :
+                              operator.sla_percentage >= 85 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}
+                            style={{ width: `${operator.sla_percentage || 100}%` }}
+                          />
+                        </div>
+                        <span className="font-semibold min-w-[60px]">
+                          {operator.sla_percentage || 100}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tabla de Tickets */}
       <Card>
