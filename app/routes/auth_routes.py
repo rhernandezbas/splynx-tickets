@@ -57,7 +57,7 @@ def login():
         session['person_id'] = user.person_id
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'login',
             'entity_type': 'user',
             'entity_id': user.id,
@@ -83,7 +83,7 @@ def logout():
         username = session.get('username')
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'logout',
             'entity_type': 'user',
             'performed_by': username,
@@ -132,7 +132,7 @@ def change_password():
         UserInterface.change_password(user_id, old_password, new_password)
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'change_password',
             'entity_type': 'user',
             'entity_id': user_id,
@@ -177,7 +177,7 @@ def create_user():
         user = UserInterface.create_user(data)
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'create',
             'entity_type': 'user',
             'entity_id': user.id,
@@ -211,7 +211,7 @@ def update_user(user_id):
         user = UserInterface.update_user(user_id, data)
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'update',
             'entity_type': 'user',
             'entity_id': user_id,
@@ -248,7 +248,7 @@ def delete_user(user_id):
         UserInterface.delete_user(user_id)
         
         # Registrar en auditoría
-        AuditLogInterface.create_log({
+        AuditLogInterface.create({
             'action': 'delete',
             'entity_type': 'user',
             'entity_id': user_id,
