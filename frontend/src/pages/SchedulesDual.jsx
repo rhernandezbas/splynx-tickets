@@ -129,7 +129,14 @@ export default function SchedulesDual() {
   }
 
   const filterSchedulesByType = (schedules) => {
-    return schedules.filter(s => (s.schedule_type || 'alert') === activeTab)
+    console.log('Filtrando horarios:', { activeTab, schedules })
+    const filtered = schedules.filter(s => {
+      const type = s.schedule_type || 'alert'
+      console.log(`Schedule ${s.id}: type=${type}, activeTab=${activeTab}, match=${type === activeTab}`)
+      return type === activeTab
+    })
+    console.log('Horarios filtrados:', filtered)
+    return filtered
   }
 
   const groupSchedulesByDay = (schedules) => {
