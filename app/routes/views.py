@@ -216,3 +216,60 @@ def auto_unassign_after_shift():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@blueprint.route("/api/tickets/sync_status", methods=["POST"])
+def sync_tickets_status_endpoint():
+    """Sincroniza el estado de tickets abiertos con Splynx"""
+    try:
+        from app.utils.sync_tickets_status import sync_tickets_status
+        from app import create_app
+        
+        app = current_app._get_current_object()
+        
+        def run_sync():
+            with app.app_context():
+                result = sync_tickets_status()
+                logger.info(f"Sincronización completada: {result}")
+        
+        hilo = threading.Thread(target=run_sync)
+        hilo.start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Sincronización de estado de tickets iniciada"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error en endpoint sync_status: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@blueprint.route("/api/tickets/import_existing", methods=["POST"])
+def import_existing_tickets():
+    """Importa tickets existentes del grupo 4 de Splynx a la BD"""
+    try:
+        from app.utils.import_existing_tickets import import_existing_tickets_from_splynx
+        
+        app = current_app._get_current_object()
+        
+        def run_import():
+            with app.app_context():
+                result = import_existing_tickets_from_splynx()
+                logger.info(f"Importación completada: {result}")
+        
+        hilo = threading.Thread(target=run_import)
+        hilo.start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Importación de tickets existentes iniciada"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error en endpoint import_existing: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
