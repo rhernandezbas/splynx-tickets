@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional, Union
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.utils.config import db
-from app.models.models import IncidentsDetection, AssignmentTracker, TicketResponseMetrics
+from app.models.models import IncidentsDetection, AssignmentTracker, TicketResponseMetrics, OperatorConfig, OperatorSchedule, SystemConfig, AuditLog
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -453,4 +453,357 @@ class TicketResponseMetricsInterface(BaseInterface):
             return TicketResponseMetrics.query.filter_by(resolved_at=None).all()
         except SQLAlchemyError as e:
             logger.error(f"Error getting unresolved metrics: {str(e)}")
+            return []
+
+
+class OperatorConfigInterface(BaseInterface):
+    """Interface for OperatorConfig model."""
+    
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[OperatorConfig]:
+        """Create a new operator configuration."""
+        try:
+            operator = OperatorConfig(
+                person_id=data.get('person_id'),
+                name=data.get('name'),
+                whatsapp_number=data.get('whatsapp_number'),
+                is_active=data.get('is_active', True),
+                is_paused=data.get('is_paused', False),
+                notifications_enabled=data.get('notifications_enabled', True)
+            )
+            if BaseInterface.add_item(operator):
+                return operator
+            return None
+        except Exception as e:
+            logger.error(f"Error creating operator config: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_person_id(person_id: int) -> Optional[OperatorConfig]:
+        """Get operator config by person ID."""
+        try:
+            return OperatorConfig.query.filter_by(person_id=person_id).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting operator config: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_all() -> List[OperatorConfig]:
+        """Get all operator configurations."""
+        try:
+            return OperatorConfig.query.all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting all operator configs: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_active_operators() -> List[OperatorConfig]:
+        """Get all active operators."""
+        try:
+            return OperatorConfig.query.filter_by(is_active=True, is_paused=False).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting active operators: {str(e)}")
+            return []
+    
+    @staticmethod
+    def update(person_id: int, data: Dict[str, Any]) -> Optional[OperatorConfig]:
+        """Update operator configuration."""
+        try:
+            operator = OperatorConfigInterface.get_by_person_id(person_id)
+            if not operator:
+                return None
+            
+            for key, value in data.items():
+                if hasattr(operator, key):
+                    setattr(operator, key, value)
+            
+            if BaseInterface.commit_changes():
+                return operator
+            return None
+        except Exception as e:
+            logger.error(f"Error updating operator config: {str(e)}")
+            return None
+    
+    @staticmethod
+    def pause_operator(person_id: int, reason: str, paused_by: str) -> bool:
+        """Pause an operator."""
+        try:
+            from datetime import datetime
+            operator = OperatorConfigInterface.get_by_person_id(person_id)
+            if not operator:
+                return False
+            
+            operator.is_paused = True
+            operator.paused_reason = reason
+            operator.paused_at = datetime.now()
+            operator.paused_by = paused_by
+            
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            logger.error(f"Error pausing operator: {str(e)}")
+            return False
+    
+    @staticmethod
+    def resume_operator(person_id: int) -> bool:
+        """Resume an operator."""
+        try:
+            operator = OperatorConfigInterface.get_by_person_id(person_id)
+            if not operator:
+                return False
+            
+            operator.is_paused = False
+            operator.paused_reason = None
+            operator.paused_at = None
+            operator.paused_by = None
+            
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            logger.error(f"Error resuming operator: {str(e)}")
+            return False
+
+
+class OperatorScheduleInterface(BaseInterface):
+    """Interface for OperatorSchedule model."""
+    
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[OperatorSchedule]:
+        """Create a new operator schedule."""
+        try:
+            schedule = OperatorSchedule(
+                person_id=data.get('person_id'),
+                day_of_week=data.get('day_of_week'),
+                start_time=data.get('start_time'),
+                end_time=data.get('end_time'),
+                is_active=data.get('is_active', True)
+            )
+            if BaseInterface.add_item(schedule):
+                return schedule
+            return None
+        except Exception as e:
+            logger.error(f"Error creating operator schedule: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_person_id(person_id: int) -> List[OperatorSchedule]:
+        """Get all schedules for a person."""
+        try:
+            return OperatorSchedule.query.filter_by(person_id=person_id, is_active=True).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting schedules by person: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_by_id(schedule_id: int) -> Optional[OperatorSchedule]:
+        """Get schedule by ID."""
+        try:
+            return OperatorSchedule.query.get(schedule_id)
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting schedule by ID: {str(e)}")
+            return None
+    
+    @staticmethod
+    def update(schedule_id: int, data: Dict[str, Any]) -> Optional[OperatorSchedule]:
+        """Update operator schedule."""
+        try:
+            schedule = OperatorScheduleInterface.get_by_id(schedule_id)
+            if not schedule:
+                return None
+            
+            for key, value in data.items():
+                if hasattr(schedule, key):
+                    setattr(schedule, key, value)
+            
+            if BaseInterface.commit_changes():
+                return schedule
+            return None
+        except Exception as e:
+            logger.error(f"Error updating schedule: {str(e)}")
+            return None
+    
+    @staticmethod
+    def delete(schedule_id: int) -> bool:
+        """Delete operator schedule."""
+        try:
+            schedule = OperatorScheduleInterface.get_by_id(schedule_id)
+            if not schedule:
+                return False
+            
+            db.session.delete(schedule)
+            return BaseInterface.commit_changes()
+        except Exception as e:
+            logger.error(f"Error deleting schedule: {str(e)}")
+            return False
+
+
+class SystemConfigInterface(BaseInterface):
+    """Interface for SystemConfig model."""
+    
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[SystemConfig]:
+        """Create a new system configuration."""
+        try:
+            config = SystemConfig(
+                key=data.get('key'),
+                value=data.get('value'),
+                value_type=data.get('value_type', 'string'),
+                description=data.get('description'),
+                category=data.get('category'),
+                updated_by=data.get('updated_by')
+            )
+            if BaseInterface.add_item(config):
+                return config
+            return None
+        except Exception as e:
+            logger.error(f"Error creating system config: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_key(key: str) -> Optional[SystemConfig]:
+        """Get config by key."""
+        try:
+            return SystemConfig.query.filter_by(key=key).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting config by key: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_by_category(category: str) -> List[SystemConfig]:
+        """Get all configs by category."""
+        try:
+            return SystemConfig.query.filter_by(category=category).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting configs by category: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_all() -> List[SystemConfig]:
+        """Get all system configurations."""
+        try:
+            return SystemConfig.query.all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting all system configs: {str(e)}")
+            return []
+    
+    @staticmethod
+    def update_or_create(key: str, value: str, updated_by: str = None, **kwargs) -> Optional[SystemConfig]:
+        """Update existing config or create new one."""
+        try:
+            config = SystemConfigInterface.get_by_key(key)
+            if config:
+                config.value = value
+                config.updated_by = updated_by
+                for k, v in kwargs.items():
+                    if hasattr(config, k):
+                        setattr(config, k, v)
+            else:
+                config = SystemConfig(
+                    key=key,
+                    value=value,
+                    updated_by=updated_by,
+                    **kwargs
+                )
+                db.session.add(config)
+            
+            if BaseInterface.commit_changes():
+                return config
+            return None
+        except Exception as e:
+            logger.error(f"Error updating or creating config: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_value(key: str, default: Any = None) -> Any:
+        """Get config value with type conversion."""
+        try:
+            config = SystemConfigInterface.get_by_key(key)
+            if not config:
+                return default
+            
+            value = config.value
+            value_type = config.value_type
+            
+            if value_type == 'int':
+                return int(value)
+            elif value_type == 'bool':
+                return value.lower() in ('true', '1', 'yes')
+            elif value_type == 'json':
+                import json
+                return json.loads(value)
+            else:
+                return value
+        except Exception as e:
+            logger.error(f"Error getting config value: {str(e)}")
+            return default
+
+
+class AuditLogInterface(BaseInterface):
+    """Interface for AuditLog model."""
+    
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[AuditLog]:
+        """Create a new audit log entry."""
+        try:
+            log = AuditLog(
+                action=data.get('action'),
+                entity_type=data.get('entity_type'),
+                entity_id=data.get('entity_id'),
+                old_value=data.get('old_value'),
+                new_value=data.get('new_value'),
+                performed_by=data.get('performed_by'),
+                ip_address=data.get('ip_address'),
+                notes=data.get('notes')
+            )
+            if BaseInterface.add_item(log):
+                return log
+            return None
+        except Exception as e:
+            logger.error(f"Error creating audit log: {str(e)}")
+            return None
+    
+    @staticmethod
+    def log_action(action: str, entity_type: str, entity_id: str = None, 
+                   old_value: Dict = None, new_value: Dict = None,
+                   performed_by: str = None, ip_address: str = None, notes: str = None) -> bool:
+        """Helper method to log an action."""
+        try:
+            data = {
+                'action': action,
+                'entity_type': entity_type,
+                'entity_id': entity_id,
+                'old_value': old_value,
+                'new_value': new_value,
+                'performed_by': performed_by,
+                'ip_address': ip_address,
+                'notes': notes
+            }
+            return AuditLogInterface.create(data) is not None
+        except Exception as e:
+            logger.error(f"Error logging action: {str(e)}")
+            return False
+    
+    @staticmethod
+    def get_recent(limit: int = 100) -> List[AuditLog]:
+        """Get recent audit logs."""
+        try:
+            return AuditLog.query.order_by(AuditLog.performed_at.desc()).limit(limit).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting recent audit logs: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_by_entity(entity_type: str, entity_id: str) -> List[AuditLog]:
+        """Get audit logs for specific entity."""
+        try:
+            return AuditLog.query.filter_by(entity_type=entity_type, entity_id=entity_id).order_by(AuditLog.performed_at.desc()).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting audit logs by entity: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_by_action(action: str, limit: int = 100) -> List[AuditLog]:
+        """Get audit logs by action type."""
+        try:
+            return AuditLog.query.filter_by(action=action).order_by(AuditLog.performed_at.desc()).limit(limit).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting audit logs by action: {str(e)}")
             return []

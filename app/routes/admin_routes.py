@@ -1,0 +1,802 @@
+"""
+Admin API Routes - Panel de administración para gestión de operadores, horarios y configuraciones
+"""
+
+from flask import Blueprint, jsonify, request, current_app
+from app.interface.interfaces import (
+    OperatorConfigInterface, 
+    OperatorScheduleInterface, 
+    SystemConfigInterface,
+    AuditLogInterface,
+    AssignmentTrackerInterface,
+    TicketResponseMetricsInterface
+)
+from app.utils.logger import get_logger
+from datetime import datetime, timedelta
+import pytz
+from sqlalchemy import func
+from app.utils.config import db
+from app.models.models import TicketResponseMetrics
+
+logger = get_logger(__name__)
+
+admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+
+
+def get_client_ip():
+    """Get client IP address from request."""
+    if request.headers.get('X-Forwarded-For'):
+        return request.headers.get('X-Forwarded-For').split(',')[0]
+    return request.remote_addr
+
+
+def log_audit(action: str, entity_type: str, entity_id: str = None, 
+              old_value: dict = None, new_value: dict = None, notes: str = None):
+    """Helper to log audit actions."""
+    try:
+        AuditLogInterface.log_action(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            old_value=old_value,
+            new_value=new_value,
+            performed_by=request.json.get('performed_by', 'admin') if request.json else 'admin',
+            ip_address=get_client_ip(),
+            notes=notes
+        )
+    except Exception as e:
+        logger.error(f"Error logging audit: {e}")
+
+
+@admin_bp.route('/operators', methods=['GET'])
+def get_operators():
+    """Get all operators with their configurations."""
+    try:
+        operators = OperatorConfigInterface.get_all()
+        
+        result = []
+        for op in operators:
+            tracker = AssignmentTrackerInterface.get_by_person_id(op.person_id)
+            schedules = OperatorScheduleInterface.get_by_person_id(op.person_id)
+            
+            result.append({
+                'person_id': op.person_id,
+                'name': op.name,
+                'whatsapp_number': op.whatsapp_number,
+                'is_active': op.is_active,
+                'is_paused': op.is_paused,
+                'paused_reason': op.paused_reason,
+                'paused_at': op.paused_at.isoformat() if op.paused_at else None,
+                'paused_by': op.paused_by,
+                'notifications_enabled': op.notifications_enabled,
+                'ticket_count': tracker.ticket_count if tracker else 0,
+                'last_assigned': tracker.last_assigned.isoformat() if tracker and tracker.last_assigned else None,
+                'schedules': [{
+                    'id': s.id,
+                    'day_of_week': s.day_of_week,
+                    'start_time': s.start_time,
+                    'end_time': s.end_time,
+                    'is_active': s.is_active
+                } for s in schedules]
+            })
+        
+        return jsonify({
+            'success': True,
+            'operators': result
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting operators: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/operators/<int:person_id>', methods=['GET'])
+def get_operator(person_id):
+    """Get specific operator details."""
+    try:
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        tracker = AssignmentTrackerInterface.get_by_person_id(person_id)
+        schedules = OperatorScheduleInterface.get_by_person_id(person_id)
+        metrics = TicketResponseMetricsInterface.get_metrics_by_person(person_id)
+        
+        return jsonify({
+            'success': True,
+            'operator': {
+                'person_id': operator.person_id,
+                'name': operator.name,
+                'whatsapp_number': operator.whatsapp_number,
+                'is_active': operator.is_active,
+                'is_paused': operator.is_paused,
+                'paused_reason': operator.paused_reason,
+                'paused_at': operator.paused_at.isoformat() if operator.paused_at else None,
+                'paused_by': operator.paused_by,
+                'notifications_enabled': operator.notifications_enabled,
+                'ticket_count': tracker.ticket_count if tracker else 0,
+                'last_assigned': tracker.last_assigned.isoformat() if tracker and tracker.last_assigned else None,
+                'total_tickets_handled': len(metrics),
+                'schedules': [{
+                    'id': s.id,
+                    'day_of_week': s.day_of_week,
+                    'start_time': s.start_time,
+                    'end_time': s.end_time,
+                    'is_active': s.is_active
+                } for s in schedules]
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting operator: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/operators/<int:person_id>', methods=['PUT'])
+def update_operator(person_id):
+    """Update operator configuration."""
+    try:
+        data = request.get_json()
+        
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        old_value = {
+            'name': operator.name,
+            'whatsapp_number': operator.whatsapp_number,
+            'is_active': operator.is_active,
+            'notifications_enabled': operator.notifications_enabled
+        }
+        
+        updated = OperatorConfigInterface.update(person_id, data)
+        if updated:
+            log_audit(
+                action='update_operator',
+                entity_type='operator',
+                entity_id=str(person_id),
+                old_value=old_value,
+                new_value=data,
+                notes=f"Updated operator {operator.name}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Operator updated successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update operator'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error updating operator: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/operators/<int:person_id>/pause', methods=['POST'])
+def pause_operator(person_id):
+    """Pause an operator."""
+    try:
+        data = request.get_json()
+        reason = data.get('reason', 'Pausa manual')
+        paused_by = data.get('paused_by', 'admin')
+        
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        success = OperatorConfigInterface.pause_operator(person_id, reason, paused_by)
+        if success:
+            log_audit(
+                action='pause_operator',
+                entity_type='operator',
+                entity_id=str(person_id),
+                new_value={'paused': True, 'reason': reason},
+                notes=f"Paused operator {operator.name}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': f'Operator {operator.name} paused successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to pause operator'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error pausing operator: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/operators/<int:person_id>/resume', methods=['POST'])
+def resume_operator(person_id):
+    """Resume a paused operator."""
+    try:
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        success = OperatorConfigInterface.resume_operator(person_id)
+        if success:
+            log_audit(
+                action='resume_operator',
+                entity_type='operator',
+                entity_id=str(person_id),
+                new_value={'paused': False},
+                notes=f"Resumed operator {operator.name}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': f'Operator {operator.name} resumed successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to resume operator'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error resuming operator: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/operators/create', methods=['POST'])
+def create_operator():
+    """Create a new operator."""
+    try:
+        data = request.get_json()
+        
+        existing = OperatorConfigInterface.get_by_person_id(data.get('person_id'))
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': 'Operator with this person_id already exists'
+            }), 400
+        
+        operator = OperatorConfigInterface.create(data)
+        if operator:
+            log_audit(
+                action='create_operator',
+                entity_type='operator',
+                entity_id=str(operator.person_id),
+                new_value=data,
+                notes=f"Created operator {operator.name}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Operator created successfully',
+                'operator_id': operator.person_id
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to create operator'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error creating operator: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/schedules', methods=['POST'])
+def create_schedule():
+    """Create a new operator schedule."""
+    try:
+        data = request.get_json()
+        
+        schedule = OperatorScheduleInterface.create(data)
+        if schedule:
+            log_audit(
+                action='create_schedule',
+                entity_type='schedule',
+                entity_id=str(schedule.id),
+                new_value=data,
+                notes=f"Created schedule for operator {data.get('person_id')}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Schedule created successfully',
+                'schedule_id': schedule.id
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to create schedule'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error creating schedule: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/schedules/<int:schedule_id>', methods=['PUT'])
+def update_schedule(schedule_id):
+    """Update an operator schedule."""
+    try:
+        data = request.get_json()
+        
+        schedule = OperatorScheduleInterface.get_by_id(schedule_id)
+        if not schedule:
+            return jsonify({
+                'success': False,
+                'error': 'Schedule not found'
+            }), 404
+        
+        old_value = {
+            'day_of_week': schedule.day_of_week,
+            'start_time': schedule.start_time,
+            'end_time': schedule.end_time,
+            'is_active': schedule.is_active
+        }
+        
+        updated = OperatorScheduleInterface.update(schedule_id, data)
+        if updated:
+            log_audit(
+                action='update_schedule',
+                entity_type='schedule',
+                entity_id=str(schedule_id),
+                old_value=old_value,
+                new_value=data,
+                notes=f"Updated schedule {schedule_id}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Schedule updated successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update schedule'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error updating schedule: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/schedules/<int:schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id):
+    """Delete an operator schedule."""
+    try:
+        schedule = OperatorScheduleInterface.get_by_id(schedule_id)
+        if not schedule:
+            return jsonify({
+                'success': False,
+                'error': 'Schedule not found'
+            }), 404
+        
+        old_value = {
+            'person_id': schedule.person_id,
+            'day_of_week': schedule.day_of_week,
+            'start_time': schedule.start_time,
+            'end_time': schedule.end_time
+        }
+        
+        success = OperatorScheduleInterface.delete(schedule_id)
+        if success:
+            log_audit(
+                action='delete_schedule',
+                entity_type='schedule',
+                entity_id=str(schedule_id),
+                old_value=old_value,
+                notes=f"Deleted schedule {schedule_id}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Schedule deleted successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to delete schedule'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error deleting schedule: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/assignment/reset', methods=['POST'])
+def reset_assignment_counters():
+    """Reset all assignment counters (round-robin)."""
+    try:
+        data = request.get_json() or {}
+        
+        trackers = AssignmentTrackerInterface.get_all()
+        old_values = {str(t.person_id): t.ticket_count for t in trackers}
+        
+        success = AssignmentTrackerInterface.reset_all_counts()
+        if success:
+            log_audit(
+                action='reset_counters',
+                entity_type='assignment',
+                old_value=old_values,
+                new_value={'all_counters': 0},
+                notes='Reset all assignment counters'
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Assignment counters reset successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to reset counters'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error resetting counters: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/assignment/stats', methods=['GET'])
+def get_assignment_stats():
+    """Get assignment statistics."""
+    try:
+        trackers = AssignmentTrackerInterface.get_all()
+        
+        stats = []
+        for tracker in trackers:
+            operator = OperatorConfigInterface.get_by_person_id(tracker.person_id)
+            stats.append({
+                'person_id': tracker.person_id,
+                'name': operator.name if operator else f'Operator {tracker.person_id}',
+                'ticket_count': tracker.ticket_count,
+                'last_assigned': tracker.last_assigned.isoformat() if tracker.last_assigned else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting assignment stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/config', methods=['GET'])
+def get_system_config():
+    """Get all system configurations."""
+    try:
+        category = request.args.get('category')
+        
+        if category:
+            configs = SystemConfigInterface.get_by_category(category)
+        else:
+            configs = SystemConfigInterface.get_all()
+        
+        result = [{
+            'key': c.key,
+            'value': c.value,
+            'value_type': c.value_type,
+            'description': c.description,
+            'category': c.category,
+            'updated_at': c.updated_at.isoformat() if c.updated_at else None,
+            'updated_by': c.updated_by
+        } for c in configs]
+        
+        return jsonify({
+            'success': True,
+            'configs': result
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting system config: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/config/<key>', methods=['GET'])
+def get_config_value(key):
+    """Get specific configuration value."""
+    try:
+        config = SystemConfigInterface.get_by_key(key)
+        if not config:
+            return jsonify({
+                'success': False,
+                'error': 'Configuration not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'config': {
+                'key': config.key,
+                'value': config.value,
+                'value_type': config.value_type,
+                'description': config.description,
+                'category': config.category
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting config value: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/config/<key>', methods=['PUT'])
+def update_config(key):
+    """Update or create system configuration."""
+    try:
+        data = request.get_json()
+        value = data.get('value')
+        updated_by = data.get('updated_by', 'admin')
+        
+        old_config = SystemConfigInterface.get_by_key(key)
+        old_value = old_config.value if old_config else None
+        
+        config = SystemConfigInterface.update_or_create(
+            key=key,
+            value=value,
+            updated_by=updated_by,
+            value_type=data.get('value_type', 'string'),
+            description=data.get('description'),
+            category=data.get('category')
+        )
+        
+        if config:
+            log_audit(
+                action='update_config',
+                entity_type='config',
+                entity_id=key,
+                old_value={'value': old_value},
+                new_value={'value': value},
+                notes=f"Updated config {key}"
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Configuration updated successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update configuration'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/audit', methods=['GET'])
+def get_audit_logs():
+    """Get audit logs."""
+    try:
+        limit = int(request.args.get('limit', 100))
+        action = request.args.get('action')
+        entity_type = request.args.get('entity_type')
+        entity_id = request.args.get('entity_id')
+        
+        if action:
+            logs = AuditLogInterface.get_by_action(action, limit)
+        elif entity_type and entity_id:
+            logs = AuditLogInterface.get_by_entity(entity_type, entity_id)
+        else:
+            logs = AuditLogInterface.get_recent(limit)
+        
+        result = [{
+            'id': log.id,
+            'action': log.action,
+            'entity_type': log.entity_type,
+            'entity_id': log.entity_id,
+            'old_value': log.old_value,
+            'new_value': log.new_value,
+            'performed_by': log.performed_by,
+            'performed_at': log.performed_at.isoformat() if log.performed_at else None,
+            'ip_address': log.ip_address,
+            'notes': log.notes
+        } for log in logs]
+        
+        return jsonify({
+            'success': True,
+            'logs': result
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting audit logs: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/dashboard/stats', methods=['GET'])
+def get_dashboard_stats():
+    """Get dashboard statistics."""
+    try:
+        tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz_argentina)
+        
+        operators = OperatorConfigInterface.get_all()
+        active_operators = len([o for o in operators if o.is_active and not o.is_paused])
+        paused_operators = len([o for o in operators if o.is_paused])
+        
+        trackers = AssignmentTrackerInterface.get_all()
+        total_assignments = sum(t.ticket_count for t in trackers)
+        
+        unresolved_metrics = TicketResponseMetricsInterface.get_unresolved_metrics()
+        overdue_tickets = len([m for m in unresolved_metrics if m.exceeded_threshold])
+        
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_metrics = db.session.query(TicketResponseMetrics).filter(
+            TicketResponseMetrics.created_at >= today_start
+        ).all()
+        
+        avg_response_time = 0
+        if today_metrics:
+            response_times = [m.response_time_minutes for m in today_metrics if m.response_time_minutes]
+            if response_times:
+                avg_response_time = sum(response_times) / len(response_times)
+        
+        operator_stats = []
+        for tracker in trackers:
+            operator = OperatorConfigInterface.get_by_person_id(tracker.person_id)
+            if operator:
+                metrics = TicketResponseMetricsInterface.get_metrics_by_person(tracker.person_id)
+                unresolved = [m for m in metrics if not m.resolved_at]
+                
+                operator_stats.append({
+                    'person_id': tracker.person_id,
+                    'name': operator.name,
+                    'is_active': operator.is_active,
+                    'is_paused': operator.is_paused,
+                    'current_assignments': tracker.ticket_count,
+                    'total_handled': len(metrics),
+                    'unresolved': len(unresolved),
+                    'avg_response_time': sum(m.response_time_minutes for m in metrics if m.response_time_minutes) / len(metrics) if metrics else 0
+                })
+        
+        from app.utils.system_control import SystemControl
+        system_status = SystemControl.get_status()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'system': {
+                    'status': system_status.get('status'),
+                    'paused': system_status.get('paused'),
+                    'paused_reason': system_status.get('reason')
+                },
+                'operators': {
+                    'total': len(operators),
+                    'active': active_operators,
+                    'paused': paused_operators
+                },
+                'assignments': {
+                    'total': total_assignments,
+                    'today': len(today_metrics)
+                },
+                'tickets': {
+                    'unresolved': len(unresolved_metrics),
+                    'overdue': overdue_tickets,
+                    'avg_response_time_minutes': round(avg_response_time, 2)
+                },
+                'operator_stats': operator_stats
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting dashboard stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/metrics/operator/<int:person_id>', methods=['GET'])
+def get_operator_metrics(person_id):
+    """Get detailed metrics for an operator."""
+    try:
+        days = int(request.args.get('days', 7))
+        
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz_argentina)
+        start_date = now - timedelta(days=days)
+        
+        metrics = db.session.query(TicketResponseMetrics).filter(
+            TicketResponseMetrics.assigned_to == person_id,
+            TicketResponseMetrics.created_at >= start_date
+        ).all()
+        
+        total_tickets = len(metrics)
+        resolved_tickets = len([m for m in metrics if m.resolved_at])
+        unresolved_tickets = total_tickets - resolved_tickets
+        exceeded_threshold = len([m for m in metrics if m.exceeded_threshold])
+        
+        response_times = [m.response_time_minutes for m in metrics if m.response_time_minutes]
+        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        
+        daily_stats = {}
+        for metric in metrics:
+            date_key = metric.created_at.strftime('%Y-%m-%d')
+            if date_key not in daily_stats:
+                daily_stats[date_key] = {'total': 0, 'resolved': 0, 'exceeded': 0}
+            daily_stats[date_key]['total'] += 1
+            if metric.resolved_at:
+                daily_stats[date_key]['resolved'] += 1
+            if metric.exceeded_threshold:
+                daily_stats[date_key]['exceeded'] += 1
+        
+        return jsonify({
+            'success': True,
+            'metrics': {
+                'operator': {
+                    'person_id': person_id,
+                    'name': operator.name
+                },
+                'period': {
+                    'days': days,
+                    'start_date': start_date.isoformat(),
+                    'end_date': now.isoformat()
+                },
+                'summary': {
+                    'total_tickets': total_tickets,
+                    'resolved': resolved_tickets,
+                    'unresolved': unresolved_tickets,
+                    'exceeded_threshold': exceeded_threshold,
+                    'avg_response_time_minutes': round(avg_response_time, 2)
+                },
+                'daily_stats': daily_stats
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting operator metrics: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

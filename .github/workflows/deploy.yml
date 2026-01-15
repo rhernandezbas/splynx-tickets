@@ -106,13 +106,24 @@ jobs:
           script: |
             cd /opt/splynx-tickets
             
-            # Verificar que el contenedor está corriendo
+            # Verificar que los contenedores están corriendo
             if docker compose ps | grep -q "Up"; then
-              echo "✅ Contenedor corriendo correctamente"
-              echo "🌐 Aplicación disponible en: http://190.7.234.37:7842"
+              echo "✅ Contenedores corriendo correctamente"
+              echo ""
+              echo "📊 Estado de servicios:"
+              docker compose ps
+              echo ""
+              echo "🌐 Frontend disponible en: http://190.7.234.37:7842"
+              echo "🔌 Backend (interno): http://backend:7842"
+              echo ""
+              echo "📋 Logs del frontend:"
+              docker compose logs --tail=10 frontend
+              echo ""
+              echo "📋 Logs del backend:"
+              docker compose logs --tail=10 backend
               exit 0
             else
-              echo "❌ Error: Contenedor no está corriendo"
+              echo "❌ Error: Contenedores no están corriendo"
               docker compose logs --tail=50
               exit 1
             fi
