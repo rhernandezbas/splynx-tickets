@@ -11,7 +11,9 @@ import {
   BarChart3,
   LogOut,
   UserCog,
-  ScrollText
+  ScrollText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -25,10 +27,10 @@ const navigation = [
   { name: 'Gestión de Operadores', href: '/operators-management', icon: Users },
   { name: 'Mensajes', href: '/messages', icon: MessageSquare },
   { name: 'Métricas', href: '/metrics', icon: BarChart3 },
-  { name: 'Logs del Sistema', href: '/logs', icon: ScrollText },
   { name: 'Usuarios', href: '/users', icon: UserCog },
   { name: 'Configuración', href: '/configuration', icon: Settings },
   { name: 'Auditoría', href: '/audit', icon: FileText },
+  { name: 'Logs del Sistema', href: '/logs', icon: ScrollText },
 ]
 
 export default function Layout() {
@@ -36,6 +38,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const handleLogout = async () => {
     try {
@@ -63,7 +66,7 @@ export default function Layout() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white">
           <div className="flex h-16 items-center justify-between px-4 border-b">
-            <h1 className="text-xl font-bold text-primary">Admin Panel</h1>
+            <h1 className="text-xl font-bold text-primary">Betelgeuse</h1>
             <button onClick={() => setSidebarOpen(false)}>
               <X className="h-6 w-6" />
             </button>
@@ -102,10 +105,26 @@ export default function Layout() {
       </div>
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+      <div className={cn(
+        "hidden lg:fixed lg:inset-y-0 lg:flex lg:flex-col transition-all duration-300",
+        sidebarCollapsed ? "lg:w-20" : "lg:w-64"
+      )}>
         <div className="flex flex-col flex-grow bg-white border-r overflow-y-auto">
-          <div className="flex h-16 items-center px-4 border-b">
-            <h1 className="text-xl font-bold text-primary">Panel Admin Splynx</h1>
+          <div className="flex h-16 items-center justify-between px-4 border-b">
+            {!sidebarCollapsed && (
+              <h1 className="text-xl font-bold text-primary">Betelgeuse</h1>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+              title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="h-5 w-5 text-gray-600" />
+              ) : (
+                <ChevronLeft className="h-5 w-5 text-gray-600" />
+              )}
+            </button>
           </div>
           <nav className="flex-1 space-y-1 px-2 py-4">
             {navigation.map((item) => {
@@ -118,11 +137,13 @@ export default function Layout() {
                     "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive
                       ? "bg-primary text-white"
-                      : "text-gray-700 hover:bg-gray-100"
+                      : "text-gray-700 hover:bg-gray-100",
+                    sidebarCollapsed && "justify-center"
                   )}
+                  title={sidebarCollapsed ? item.name : ""}
                 >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
+                  <item.icon className={cn("h-5 w-5", !sidebarCollapsed && "mr-3")} />
+                  {!sidebarCollapsed && item.name}
                 </Link>
               )
             })}
@@ -130,17 +151,24 @@ export default function Layout() {
           <div className="p-4 border-t">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              className={cn(
+                "w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors",
+                sidebarCollapsed && "justify-center"
+              )}
+              title={sidebarCollapsed ? "Cerrar Sesión" : ""}
             >
-              <LogOut className="mr-3 h-5 w-5" />
-              Cerrar Sesión
+              <LogOut className={cn("h-5 w-5", !sidebarCollapsed && "mr-3")} />
+              {!sidebarCollapsed && "Cerrar Sesión"}
             </button>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={cn(
+        "transition-all duration-300",
+        sidebarCollapsed ? "lg:pl-20" : "lg:pl-64"
+      )}>
         {/* Mobile header */}
         <div className="sticky top-0 z-10 flex h-16 items-center gap-x-4 border-b bg-white px-4 shadow-sm lg:hidden">
           <button
