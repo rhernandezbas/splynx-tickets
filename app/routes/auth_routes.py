@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request, session
 from app.interface.users import UserInterface
 from app.interface.interfaces import AuditLogInterface
 from app.utils.logger import get_logger
-from app.utils.database import db
+from app.utils.config import db
 from functools import wraps
 
 logger = get_logger(__name__)
