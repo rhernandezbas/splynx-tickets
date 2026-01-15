@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { 
   LayoutDashboard, 
   Users, 
@@ -7,23 +7,48 @@ import {
   FileText,
   MessageSquare,
   Menu,
-  X
+  X,
+  BarChart3,
+  LogOut
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Operadores', href: '/operators', icon: Users },
   { name: 'Horarios', href: '/schedules', icon: Clock },
   { name: 'Mensajes', href: '/messages', icon: MessageSquare },
+  { name: 'Métricas', href: '/metrics', icon: BarChart3 },
   { name: 'Configuración', href: '/configuration', icon: Settings },
   { name: 'Auditoría', href: '/audit', icon: FileText },
 ]
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/auth/logout`, {}, { withCredentials: true })
+      sessionStorage.clear()
+      toast({
+        title: 'Sesión cerrada',
+        description: 'Has cerrado sesión exitosamente'
+      })
+      navigate('/login')
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+      sessionStorage.clear()
+      navigate('/login')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -61,6 +86,15 @@ export default function Layout() {
               )
             })}
           </nav>
+          <div className="p-4 border-t">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md"
+            >
+              <LogOut className="mr-3 h-5 w-5" />
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
       </div>
 
@@ -90,6 +124,15 @@ export default function Layout() {
               )
             })}
           </nav>
+          <div className="p-4 border-t">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            >
+              <LogOut className="mr-3 h-5 w-5" />
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
       </div>
 

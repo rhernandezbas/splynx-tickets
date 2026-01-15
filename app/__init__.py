@@ -12,13 +12,19 @@ def create_app() -> Flask:
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Configurar sesiones
+    app.config['SECRET_KEY'] = app.config.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    app.config['SESSION_TYPE'] = 'filesystem'
+    
     # Register blueprints
     from app.routes import blueprint as routes_bp
     from app.routes.admin_routes import admin_bp
     from app.routes.messages_routes import messages_bp
+    from app.routes.auth_routes import auth_bp
     app.register_blueprint(routes_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(messages_bp)
+    app.register_blueprint(auth_bp)
     logger.info("✅ Blueprints registrados correctamente")
     
     # Inicializar scheduler inmediatamente al crear la app

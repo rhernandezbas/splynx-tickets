@@ -147,5 +147,52 @@ class MessageTemplate(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(100))
 
+    def to_dict(self):
+        """Convert to dictionary"""
+        return {
+            'id': self.id,
+            'template_key': self.template_key,
+            'template_name': self.template_name,
+            'template_content': self.template_content,
+            'description': self.description,
+            'variables': self.variables,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by': self.updated_by
+        }
+
     def __repr__(self):
         return f'<MessageTemplate template_key: {self.template_key}, template_name: {self.template_name}>'
+
+
+class User(db.Model):
+    """Modelo de usuarios para autenticación"""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    full_name = db.Column(db.String(200))
+    email = db.Column(db.String(200))
+    role = db.Column(db.String(50), nullable=False)  # 'admin' o 'operator'
+    person_id = db.Column(db.Integer)  # ID del operador asociado (si es operator)
+    is_active = db.Column(db.Boolean, default=True)
+    last_login = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.String(100))
+    
+    def to_dict(self):
+        """Convert to dictionary (sin password)"""
+        return {
+            'id': self.id,
+            'username': self.username,
+            'full_name': self.full_name,
+            'email': self.email,
+            'role': self.role,
+            'person_id': self.person_id,
+            'is_active': self.is_active,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_by': self.created_by
+        }
