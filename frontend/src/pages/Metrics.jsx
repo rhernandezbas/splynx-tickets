@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { adminApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
-import { RefreshCw, Calendar, TrendingUp, Clock, AlertCircle, CheckCircle, Filter, Download, Search } from 'lucide-react'
+import { RefreshCw, Calendar, TrendingUp, Clock, AlertCircle, CheckCircle, Filter, Download, Search, Edit2, Trash2, AlertTriangle } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 
 export default function Metrics() {
@@ -12,7 +12,7 @@ export default function Metrics() {
   const [tickets, setTickets] = useState([])
   const [filteredTickets, setFilteredTickets] = useState([])
   const [filters, setFilters] = useState({
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
     status: 'all',
     operator: 'all',
@@ -55,7 +55,8 @@ export default function Metrics() {
         assigned_to: incident.assigned_to,
         operator_name: incident.operator_name || 'Sin asignar',
         created_at: incident.created_at,
-        response_time: incident.response_time_minutes
+        response_time: incident.response_time_minutes,
+        exceeded_threshold: incident.exceeded_threshold || false
       }))
       
       setTickets(transformedTickets)
@@ -65,6 +66,54 @@ export default function Metrics() {
       toast({
         title: 'Error',
         description: 'Error al cargar tickets',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleToggleThreshold = async (ticketId, currentStatus) => {
+    try {
+      await adminApi.updateTicketThreshold(ticketId, { 
+        exceeded_threshold: !currentStatus 
+      })
+      
+      toast({
+        title: 'Actualizado',
+        description: `Ticket ${!currentStatus ? 'marcado como vencido' : 'desmarcado como vencido'}`,
+      })
+      
+      // Recargar datos
+      await fetchTickets()
+      await fetchMetrics()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error al actualizar el ticket',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleDeleteTicket = async (ticketId) => {
+    if (!confirm('¿Estás seguro de eliminar este ticket? Esta acción no se puede deshacer.')) {
+      return
+    }
+
+    try {
+      await adminApi.deleteTicket(ticketId)
+      
+      toast({
+        title: 'Eliminado',
+        description: 'Ticket eliminado correctamente',
+      })
+      
+      // Recargar datos
+      await fetchTickets()
+      await fetchMetrics()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error al eliminar el ticket',
         variant: 'destructive'
       })
     }
@@ -421,6 +470,8 @@ export default function Metrics() {
                   <th className="text-left p-2 font-medium">Operador</th>
                   <th className="text-left p-2 font-medium">Fecha</th>
                   <th className="text-left p-2 font-medium">Tiempo</th>
+                  <th className="text-left p-2 font-medium">Vencido</th>
+                  <th className="text-left p-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -432,9 +483,8 @@ export default function Metrics() {
                       <td className="p-2 max-w-xs truncate">{ticket.asunto}</td>
                       <td className="p-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          ticket.estado === 'Cerrado' ? 'bg-green-100 text-green-800' :
-                          ticket.estado === 'Abierto' ? 'bg-orange-100 text-orange-800' :
-                          ticket.estado === 'Vencido' ? 'bg-red-100 text-red-800' :
+                          ticket.estado === 'SUCCESS' ? 'bg-green-100 text-green-800' :
+                          ticket.estado === 'FAIL' ? 'bg-red-100 text-red-800' :
                           'bg-blue-100 text-blue-800'
                         }`}>
                           {ticket.estado}
@@ -442,8 +492,8 @@ export default function Metrics() {
                       </td>
                       <td className="p-2">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          ticket.prioridad === 'Alta' ? 'bg-red-100 text-red-800' :
-                          ticket.prioridad === 'Media' ? 'bg-yellow-100 text-yellow-800' :
+                          ticket.prioridad === 'high' ? 'bg-red-100 text-red-800' :
+                          ticket.prioridad === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {ticket.prioridad}
@@ -451,16 +501,51 @@ export default function Metrics() {
                       </td>
                       <td className="p-2">{ticket.operator_name || 'Sin asignar'}</td>
                       <td className="p-2 text-xs text-gray-600">
-                        {new Date(ticket.created_at).toLocaleString()}
+                        {ticket.created_at}
                       </td>
                       <td className="p-2 text-xs">
                         {ticket.response_time ? `${ticket.response_time} min` : 'N/A'}
+                      </td>
+                      <td className="p-2">
+                        {ticket.exceeded_threshold ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Sí
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            No
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleToggleThreshold(ticket.ticket_id, ticket.exceeded_threshold)}
+                            className="h-7 px-2"
+                            title={ticket.exceeded_threshold ? 'Marcar como NO vencido' : 'Marcar como vencido'}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteTicket(ticket.ticket_id)}
+                            className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar ticket"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" className="p-8 text-center text-muted-foreground">
+                    <td colSpan="10" className="p-8 text-center text-muted-foreground">
                       No hay tickets que coincidan con los filtros
                     </td>
                   </tr>

@@ -36,6 +36,8 @@ export const adminApi = {
   getOperatorMetrics: (personId, days) => api.get(`/api/admin/metrics/operator/${personId}`, { params: { days } }),
   getMetrics: () => api.get('/api/admin/metrics'),
   getIncidents: (params) => api.get('/api/admin/incidents', { params }),
+  updateTicketThreshold: (ticketId, data) => api.put(`/api/admin/tickets/${ticketId}/threshold`, data),
+  deleteTicket: (ticketId) => api.delete(`/api/admin/tickets/${ticketId}`),
 };
 
 export const systemApi = {

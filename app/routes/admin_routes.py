@@ -945,13 +945,16 @@ def get_incidents():
                 'operator_name': operator_map.get(incident.assigned_to, 'Sin asignar') if incident.assigned_to else 'Sin asignar',
                 'created_at': incident.Fecha_Creacion,
                 'updated_at': None,
-                'response_time_minutes': None
+                'response_time_minutes': None,
+                'exceeded_threshold': False
             }
             
-            # Obtener tiempo de respuesta si existe
+            # Obtener tiempo de respuesta y exceeded_threshold si existe
             metric = TicketResponseMetrics.query.filter_by(ticket_id=incident.Ticket_ID).first()
-            if metric and metric.response_time_minutes:
-                incident_dict['response_time_minutes'] = metric.response_time_minutes
+            if metric:
+                if metric.response_time_minutes:
+                    incident_dict['response_time_minutes'] = metric.response_time_minutes
+                incident_dict['exceeded_threshold'] = metric.exceeded_threshold or False
             
             incidents_data.append(incident_dict)
         
@@ -963,6 +966,95 @@ def get_incidents():
         
     except Exception as e:
         logger.error(f"Error getting incidents: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/tickets/<ticket_id>/threshold', methods=['PUT'])
+def update_ticket_threshold(ticket_id):
+    """Update exceeded_threshold status for a ticket."""
+    try:
+        data = request.get_json()
+        exceeded_threshold = data.get('exceeded_threshold', False)
+        
+        # Buscar el ticket en ticket_response_metrics
+        metric = TicketResponseMetrics.query.filter_by(ticket_id=ticket_id).first()
+        
+        if not metric:
+            return jsonify({
+                'success': False,
+                'error': 'Ticket no encontrado en métricas'
+            }), 404
+        
+        # Actualizar el estado
+        metric.exceeded_threshold = exceeded_threshold
+        db.session.commit()
+        
+        log_audit(
+            action='update_threshold',
+            entity_type='ticket',
+            entity_id=ticket_id,
+            old_value={'exceeded_threshold': not exceeded_threshold},
+            new_value={'exceeded_threshold': exceeded_threshold},
+            notes=f"Threshold actualizado para ticket {ticket_id}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Estado de vencimiento actualizado',
+            'ticket_id': ticket_id,
+            'exceeded_threshold': exceeded_threshold
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating ticket threshold: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@admin_bp.route('/tickets/<ticket_id>', methods=['DELETE'])
+def delete_ticket(ticket_id):
+    """Delete a ticket from incidents_detection."""
+    try:
+        from app.models.models import IncidentsDetection
+        
+        # Buscar el ticket
+        ticket = IncidentsDetection.query.filter_by(Ticket_ID=ticket_id).first()
+        
+        if not ticket:
+            return jsonify({
+                'success': False,
+                'error': 'Ticket no encontrado'
+            }), 404
+        
+        # Eliminar también de ticket_response_metrics si existe
+        metric = TicketResponseMetrics.query.filter_by(ticket_id=ticket_id).first()
+        if metric:
+            db.session.delete(metric)
+        
+        # Eliminar el ticket
+        db.session.delete(ticket)
+        db.session.commit()
+        
+        log_audit(
+            action='delete',
+            entity_type='ticket',
+            entity_id=ticket_id,
+            notes=f"Ticket {ticket_id} eliminado"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Ticket eliminado correctamente'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error deleting ticket: {e}")
+        db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)
