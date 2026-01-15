@@ -138,20 +138,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Credenciales por defecto:</p>
-                <p>Usuario: <code className="bg-white px-1 py-0.5 rounded">admin</code></p>
-                <p>Contraseña: <code className="bg-white px-1 py-0.5 rounded">admin123</code></p>
-                <p className="text-xs mt-2 text-blue-600">
-                  ⚠️ Cambiar la contraseña después del primer login
-                </p>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
