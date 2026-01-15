@@ -124,16 +124,40 @@ export default function Metrics() {
     fetchTickets()
   }, [])
 
+  // Función para parsear fecha en formato DD-MM-YYYY HH:MM:SS
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null
+    // Formato: "14-01-2026 21:41:31"
+    const parts = dateStr.split(' ')
+    const dateParts = parts[0].split('-')
+    const timeParts = parts[1]?.split(':') || ['00', '00', '00']
+    
+    // Convertir a formato ISO: YYYY-MM-DD
+    const year = dateParts[2]
+    const month = dateParts[1]
+    const day = dateParts[0]
+    
+    return new Date(`${year}-${month}-${day}T${timeParts.join(':')}`)
+  }
+
   // No aplicar filtros automáticamente, solo cuando se haga clic en buscar
   const applyFilters = () => {
     let filtered = [...tickets]
 
-    // Filtrar por fecha
+    // Filtrar por fecha (manejar formato DD-MM-YYYY)
     if (filters.startDate) {
-      filtered = filtered.filter(t => new Date(t.created_at) >= new Date(filters.startDate))
+      const startDate = new Date(filters.startDate)
+      filtered = filtered.filter(t => {
+        const ticketDate = parseDate(t.created_at)
+        return ticketDate && ticketDate >= startDate
+      })
     }
     if (filters.endDate) {
-      filtered = filtered.filter(t => new Date(t.created_at) <= new Date(filters.endDate + 'T23:59:59'))
+      const endDate = new Date(filters.endDate + 'T23:59:59')
+      filtered = filtered.filter(t => {
+        const ticketDate = parseDate(t.created_at)
+        return ticketDate && ticketDate <= endDate
+      })
     }
 
     // Filtrar por estado
@@ -184,7 +208,41 @@ export default function Metrics() {
     )
   }
 
-  const operatorData = metrics?.operator_distribution || []
+  // Calcular distribución por operador dinámicamente desde tickets filtrados
+  const operatorDistribution = {}
+  filteredTickets.forEach(ticket => {
+    const operatorId = ticket.assigned_to
+    const operatorName = ticket.operator_name
+    
+    if (!operatorDistribution[operatorId]) {
+      operatorDistribution[operatorId] = {
+        name: operatorName,
+        person_id: operatorId,
+        assigned: 0,
+        completed: 0,
+        exceeded_threshold: 0,
+        sla_percentage: 0
+      }
+    }
+    
+    operatorDistribution[operatorId].assigned++
+    if (ticket.estado === 'SUCCESS') {
+      operatorDistribution[operatorId].completed++
+    }
+    if (ticket.exceeded_threshold) {
+      operatorDistribution[operatorId].exceeded_threshold++
+    }
+  })
+  
+  // Calcular SLA para cada operador
+  Object.values(operatorDistribution).forEach(op => {
+    if (op.assigned > 0) {
+      const withinSLA = op.assigned - op.exceeded_threshold
+      op.sla_percentage = ((withinSLA / op.assigned) * 100).toFixed(2)
+    }
+  })
+  
+  const operatorData = Object.values(operatorDistribution)
   
   // Calcular métricas dinámicamente basadas en tickets filtrados
   const filteredMetrics = {

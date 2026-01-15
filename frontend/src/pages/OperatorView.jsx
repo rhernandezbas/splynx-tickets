@@ -36,7 +36,11 @@ export default function OperatorView() {
       const operator = operatorsResponse.data.operators.find(op => op.person_id === personId)
       setOperatorData(operator)
 
-      // Obtener métricas del operador
+      // Obtener métricas del operador del mes actual
+      const now = new Date()
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      
       const metricsResponse = await adminApi.getMetrics()
       const operatorMetrics = metricsResponse.data.metrics.operator_distribution?.find(
         op => op.person_id === personId
@@ -51,6 +55,17 @@ export default function OperatorView() {
         })
         const tickets = ticketsResponse.data.incidents || []
         
+        // Función para parsear fecha DD-MM-YYYY
+        const parseDate = (dateStr) => {
+          if (!dateStr) return null
+          const parts = dateStr.split(' ')
+          const dateParts = parts[0].split('-')
+          const year = dateParts[2]
+          const month = dateParts[1]
+          const day = dateParts[0]
+          return new Date(`${year}-${month}-${day}`)
+        }
+        
         // Transformar al formato esperado
         const formattedTickets = tickets.map(ticket => ({
           id: ticket.id,
@@ -62,27 +77,41 @@ export default function OperatorView() {
           created_at: ticket.created_at,
           assigned_at: ticket.created_at,
           is_closed: ticket.is_closed,
-          closed_at: ticket.closed_at
+          closed_at: ticket.closed_at,
+          exceeded_threshold: ticket.exceeded_threshold
         }))
         
         setMyTickets(formattedTickets)
         
-        // Calcular métricas localmente
+        // Calcular métricas localmente solo del mes actual
         const allTicketsResponse = await adminApi.getIncidents({ 
           assigned_to: personId,
           ticket_status: 'all'
         })
         const allTickets = allTicketsResponse.data.incidents || []
         
-        const openCount = allTickets.filter(t => !t.is_closed).length
-        const closedCount = allTickets.filter(t => t.is_closed).length
-        const totalCount = allTickets.length
+        // Filtrar tickets del mes actual
+        const monthlyTickets = allTickets.filter(t => {
+          const ticketDate = parseDate(t.created_at)
+          return ticketDate && 
+                 ticketDate >= firstDayOfMonth && 
+                 ticketDate <= lastDayOfMonth
+        })
+        
+        const openCount = monthlyTickets.filter(t => !t.is_closed).length
+        const closedCount = monthlyTickets.filter(t => t.is_closed).length
+        const totalCount = monthlyTickets.length
+        
+        // Calcular SLA mensual
+        const exceededCount = monthlyTickets.filter(t => t.exceeded_threshold).length
+        const withinSLA = totalCount - exceededCount
+        const monthlySLA = totalCount > 0 ? ((withinSLA / totalCount) * 100) : 100
         
         setStats({
           assigned: openCount,
           completed: closedCount,
           total: totalCount,
-          sla_percentage: operatorMetrics?.sla_percentage || 100
+          sla_percentage: monthlySLA
         })
       } catch (error) {
         console.error('Error al cargar tickets:', error)
@@ -257,7 +286,7 @@ export default function OperatorView() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">SLA Actual</CardTitle>
+            <CardTitle className="text-sm font-medium">SLA Mensual</CardTitle>
             <TrendingUp className={`h-4 w-4 ${(stats?.sla_percentage || 100) >= 90 ? 'text-green-600' : (stats?.sla_percentage || 100) >= 70 ? 'text-yellow-600' : 'text-red-600'}`} />
           </CardHeader>
           <CardContent>
@@ -265,7 +294,7 @@ export default function OperatorView() {
               {(stats?.sla_percentage || 100).toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              Cumplimiento de SLA
+              Cumplimiento de SLA (mes actual)
             </p>
           </CardContent>
         </Card>
