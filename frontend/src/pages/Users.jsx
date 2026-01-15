@@ -9,6 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 export default function Users() {
   const [users, setUsers] = useState([])
+  const [operators, setOperators] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -20,7 +21,8 @@ export default function Users() {
     password: '',
     full_name: '',
     email: '',
-    role: 'operator'
+    role: 'operator',
+    person_id: ''
   })
   const [passwordData, setPasswordData] = useState({
     old_password: '',
@@ -51,8 +53,20 @@ export default function Users() {
     }
   }
 
+  const fetchOperators = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/admin/operators`, {
+        withCredentials: true
+      })
+      setOperators(response.data.operators || [])
+    } catch (error) {
+      console.error('Error al cargar operadores:', error)
+    }
+  }
+
   useEffect(() => {
     fetchUsers()
+    fetchOperators()
   }, [])
 
   const handleCreate = () => {
@@ -62,7 +76,8 @@ export default function Users() {
       password: '',
       full_name: '',
       email: '',
-      role: 'operator'
+      role: 'operator',
+      person_id: ''
     })
     setShowModal(true)
   }
@@ -74,7 +89,8 @@ export default function Users() {
       password: '',
       full_name: user.full_name || '',
       email: user.email || '',
-      role: user.role
+      role: user.role,
+      person_id: user.person_id || ''
     })
     setShowModal(true)
   }
@@ -283,6 +299,7 @@ export default function Users() {
                   <th className="text-left p-3 font-medium">Nombre Completo</th>
                   <th className="text-left p-3 font-medium">Email</th>
                   <th className="text-left p-3 font-medium">Rol</th>
+                  <th className="text-left p-3 font-medium">Person ID</th>
                   <th className="text-left p-3 font-medium">Estado</th>
                   <th className="text-left p-3 font-medium">Último Login</th>
                   <th className="text-left p-3 font-medium">Acciones</th>
@@ -301,6 +318,15 @@ export default function Users() {
                       }`}>
                         {user.role === 'admin' ? 'Administrador' : 'Operador'}
                       </span>
+                    </td>
+                    <td className="p-3">
+                      {user.person_id ? (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          {user.person_id}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Sin asignar</span>
+                      )}
                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -417,6 +443,29 @@ export default function Users() {
                   <option value="admin">Administrador</option>
                 </select>
               </div>
+              
+              {formData.role === 'operator' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Operador Asignado (Person ID)
+                  </label>
+                  <select
+                    value={formData.person_id}
+                    onChange={(e) => setFormData({ ...formData, person_id: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Sin asignar</option>
+                    {operators.map((op) => (
+                      <option key={op.person_id} value={op.person_id}>
+                        {op.name} (ID: {op.person_id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Selecciona un operador del sistema para vincular esta cuenta
+                  </p>
+                </div>
+              )}
               
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setShowModal(false)}>
