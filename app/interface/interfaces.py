@@ -3,7 +3,7 @@ This module provides interfaces for CRUD operations on models.
 """
 
 from typing import List, Dict, Any, Optional, Union
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.utils.config import db
 from app.models.models import IncidentsDetection, AssignmentTracker, TicketResponseMetrics, OperatorConfig, OperatorSchedule, SystemConfig, AuditLog, MessageTemplate
@@ -21,6 +21,11 @@ class BaseInterface:
         try:
             db.session.commit()
             return True
+        except IntegrityError as e:
+            db.session.rollback()
+            # Duplicate key es esperado, no es un error crítico
+            logger.info(f"Registro duplicado (esperado): {str(e)}")
+            return False
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"Database error: {str(e)}")
@@ -32,6 +37,11 @@ class BaseInterface:
         try:
             db.session.add(item)
             return BaseInterface.commit_changes()
+        except IntegrityError as e:
+            db.session.rollback()
+            # Duplicate key es esperado, no es un error crítico
+            logger.info(f"Registro duplicado al agregar item (esperado): {str(e)}")
+            return False
         except SQLAlchemyError as e:
             db.session.rollback()
             logger.error(f"Error adding item: {str(e)}")
@@ -67,6 +77,10 @@ class IncidentsInterface(BaseInterface):
             
             if BaseInterface.add_item(incident):
                 return incident
+            return None
+        except IntegrityError as e:
+            # Duplicate key es esperado cuando el ticket ya existe
+            logger.info(f"Incident duplicado (ya existe): Fecha_Creacion={data.get('Fecha_Creacion')}")
             return None
         except Exception as e:
             logger.error(f"Error creating incident: {str(e)}")
