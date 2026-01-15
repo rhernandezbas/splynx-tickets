@@ -351,16 +351,26 @@ export default function OperatorsManagement() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
-                      <CardTitle className="flex items-center gap-2">
+                      <CardTitle className="flex items-center gap-2 flex-wrap">
                         {operator.name}
                         {operator.is_paused && (
                           <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                            Pausado
+                            🔴 Pausado Total
+                          </span>
+                        )}
+                        {!operator.is_paused && operator.assignment_paused && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            🚫 Sin Asignación
+                          </span>
+                        )}
+                        {!operator.notifications_enabled && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            🔕 Sin Notif.
                           </span>
                         )}
                         {!operator.is_active && (
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            Inactivo
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            ❌ Inactivo
                           </span>
                         )}
                       </CardTitle>
