@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 
-logs_bp = Blueprint('logs', __name__, url_prefix='/api/logs')
+logs_bp = Blueprint('logs', __name__, url_prefix='/api')
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs', 'app_splynx.log')
 
@@ -23,7 +23,7 @@ def parse_log_line(line):
         }
     return None
 
-@logs_bp.route('', methods=['GET'])
+@logs_bp.route('/logs', methods=['GET'])
 def get_logs():
     """Get logs with filters"""
     try:
