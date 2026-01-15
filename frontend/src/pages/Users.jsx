@@ -12,7 +12,9 @@ export default function Users() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
   const [formData, setFormData] = useState({
     username: '',
     password: '',
@@ -22,6 +24,10 @@ export default function Users() {
   })
   const [passwordData, setPasswordData] = useState({
     old_password: '',
+    new_password: '',
+    confirm_password: ''
+  })
+  const [resetPasswordData, setResetPasswordData] = useState({
     new_password: '',
     confirm_password: ''
   })
@@ -179,6 +185,54 @@ export default function Users() {
     }
   }
 
+  const handleResetPassword = (user) => {
+    setResetPasswordUser(user)
+    setResetPasswordData({
+      new_password: '',
+      confirm_password: ''
+    })
+    setShowResetPasswordModal(true)
+  }
+
+  const handleSubmitResetPassword = async (e) => {
+    e.preventDefault()
+    
+    if (resetPasswordData.new_password !== resetPasswordData.confirm_password) {
+      toast({
+        title: 'Error',
+        description: 'Las contraseñas no coinciden',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      await axios.post(`${API_BASE_URL}/api/auth/users/${resetPasswordUser.id}/reset-password`, {
+        new_password: resetPasswordData.new_password
+      }, {
+        withCredentials: true
+      })
+      
+      toast({
+        title: 'Actualizado',
+        description: `Contraseña de ${resetPasswordUser.username} actualizada correctamente`
+      })
+      
+      setShowResetPasswordModal(false)
+      setResetPasswordUser(null)
+      setResetPasswordData({
+        new_password: '',
+        confirm_password: ''
+      })
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Error al resetear contraseña',
+        variant: 'destructive'
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -265,8 +319,18 @@ export default function Users() {
                           variant="outline"
                           onClick={() => handleEdit(user)}
                           className="h-8 px-2"
+                          title="Editar usuario"
                         >
                           <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleResetPassword(user)}
+                          className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Cambiar contraseña"
+                        >
+                          <Key className="h-3 w-3" />
                         </Button>
                         {user.username !== 'admin' && (
                           <Button
@@ -274,6 +338,7 @@ export default function Users() {
                             variant="outline"
                             onClick={() => handleDelete(user.id)}
                             className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            title="Eliminar usuario"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -407,6 +472,60 @@ export default function Users() {
               
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setShowPasswordModal(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  Cambiar Contraseña
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Resetear Contraseña de Usuario */}
+      {showResetPasswordModal && resetPasswordUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">
+              Cambiar Contraseña de {resetPasswordUser.username}
+            </h2>
+            <form onSubmit={handleSubmitResetPassword} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Nueva Contraseña</label>
+                <input
+                  type="text"
+                  value={resetPasswordData.new_password}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, new_password: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                  required
+                  placeholder="Ingresa la nueva contraseña"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  La contraseña será visible para que puedas compartirla con el usuario
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Confirmar Nueva Contraseña</label>
+                <input
+                  type="text"
+                  value={resetPasswordData.confirm_password}
+                  onChange={(e) => setResetPasswordData({ ...resetPasswordData, confirm_password: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                  required
+                  placeholder="Confirma la nueva contraseña"
+                />
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Nota:</strong> Asegúrate de compartir esta contraseña con el usuario de forma segura.
+                </p>
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={() => setShowResetPasswordModal(false)}>
                   Cancelar
                 </Button>
                 <Button type="submit">

@@ -266,6 +266,47 @@ def delete_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 
+@auth_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+@admin_required
+def reset_user_password(user_id):
+    """Resetear contraseña de un usuario (solo admin)"""
+    try:
+        data = request.get_json()
+        new_password = data.get('new_password')
+        
+        if not new_password:
+            return jsonify({'error': 'Nueva contraseña requerida'}), 400
+        
+        user = UserInterface.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        # Actualizar contraseña
+        from werkzeug.security import generate_password_hash
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+        
+        # Registrar en auditoría
+        AuditLogInterface.create({
+            'action': 'reset_password',
+            'entity_type': 'user',
+            'entity_id': user_id,
+            'performed_by': session.get('username'),
+            'ip_address': request.remote_addr,
+            'notes': f'Contraseña reseteada para {user.username}'
+        })
+        
+        return jsonify({
+            'message': 'Contraseña actualizada correctamente',
+            'username': user.username
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al resetear contraseña: {e}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @auth_bp.route('/users/by-role/<string:role>', methods=['GET'])
 @admin_required
 def get_users_by_role(role):
