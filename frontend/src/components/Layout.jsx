@@ -10,7 +10,8 @@ import {
   X,
   BarChart3,
   LogOut,
-  UserCog
+  UserCog,
+  ScrollText
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -24,6 +25,7 @@ const navigation = [
   { name: 'Gestión de Operadores', href: '/operators-management', icon: Users },
   { name: 'Mensajes', href: '/messages', icon: MessageSquare },
   { name: 'Métricas', href: '/metrics', icon: BarChart3 },
+  { name: 'Logs del Sistema', href: '/logs', icon: ScrollText },
   { name: 'Usuarios', href: '/users', icon: UserCog },
   { name: 'Configuración', href: '/configuration', icon: Settings },
   { name: 'Auditoría', href: '/audit', icon: FileText },

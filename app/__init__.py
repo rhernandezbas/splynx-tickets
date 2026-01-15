@@ -21,10 +21,12 @@ def create_app() -> Flask:
     from app.routes.admin_routes import admin_bp
     from app.routes.messages_routes import messages_bp
     from app.routes.auth_routes import auth_bp
+    from app.routes.logs_routes import logs_bp
     app.register_blueprint(routes_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(logs_bp)
     logger.info("✅ Blueprints registrados correctamente")
     
     # Inicializar scheduler inmediatamente al crear la app

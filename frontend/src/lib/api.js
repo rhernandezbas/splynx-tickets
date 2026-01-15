@@ -55,4 +55,10 @@ export const messagesApi = {
   createTemplate: (data) => api.post('/api/admin/messages/templates', data),
 };
 
+export const logsApi = {
+  getLogs: (params) => api.get('/api/logs', { params }),
+  getStats: (params) => api.get('/api/logs/stats', { params }),
+  clearLogs: () => api.post('/api/logs/clear'),
+};
+
 export default api;
