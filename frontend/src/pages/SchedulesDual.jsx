@@ -56,10 +56,14 @@ export default function SchedulesDual() {
 
   const handleSaveNewSchedule = async () => {
     try {
-      await adminApi.createSchedule({
+      const scheduleData = {
         ...newSchedule,
+        schedule_type: activeTab, // Asegurar que use el tab actual
         performed_by: 'admin'
-      })
+      }
+      console.log('Guardando horario:', scheduleData)
+      
+      await adminApi.createSchedule(scheduleData)
       toast({
         title: 'Horario Creado',
         description: `Horario de ${activeTab === 'work' ? 'trabajo' : 'alertas'} creado exitosamente`
@@ -67,6 +71,7 @@ export default function SchedulesDual() {
       setNewSchedule(null)
       fetchOperators()
     } catch (error) {
+      console.error('Error al crear horario:', error)
       toast({
         title: 'Error',
         description: 'Error al crear horario',
