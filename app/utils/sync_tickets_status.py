@@ -40,17 +40,33 @@ def sync_tickets_status():
                 splynx_ticket = splynx.get_ticket(ticket_id)
                 
                 if splynx_ticket:
-                    status = splynx_ticket.get('status', '').lower()
+                    # Usar el campo 'closed' de la respuesta de Splynx
+                    is_closed = splynx_ticket.get('closed', '0') == '1'
+                    status_id = splynx_ticket.get('status_id', '')
+                    updated_at = splynx_ticket.get('updated_at', '')
                     
-                    # Si el ticket está cerrado en Splynx
-                    if status in ['closed', 'success', 'resolved', 'done']:
-                        ticket.Estado = splynx_ticket.get('status', ticket.Estado)
-                        ticket.closed_at = datetime.now()
+                    # Si el ticket está cerrado en Splynx (closed = "1")
+                    if is_closed:
+                        # Usar updated_at de Splynx como fecha de cierre
+                        if updated_at:
+                            try:
+                                ticket.closed_at = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                ticket.closed_at = datetime.now()
+                        else:
+                            ticket.closed_at = datetime.now()
+                        
+                        # Actualizar estado basado en status_id
+                        if status_id == '3':
+                            ticket.Estado = 'SUCCESS'
+                        else:
+                            ticket.Estado = 'CLOSED'
+                        
                         closed_count += 1
-                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado")
+                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, status_id={status_id}, updated_at={updated_at})")
                     else:
-                        # Actualizar estado aunque no esté cerrado
-                        ticket.Estado = splynx_ticket.get('status', ticket.Estado)
+                        # Ticket aún abierto, actualizar status_id si cambió
+                        logger.debug(f"ℹ️  Ticket {ticket_id} aún abierto (closed=0, status_id={status_id})")
                         
             except Exception as e:
                 logger.error(f"❌ Error al sincronizar ticket {ticket.Ticket_ID}: {e}")
