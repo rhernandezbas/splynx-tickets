@@ -15,6 +15,7 @@ export const adminApi = {
   getOperators: () => api.get('/api/admin/operators'),
   getOperator: (personId) => api.get(`/api/admin/operators/${personId}`),
   updateOperator: (personId, data) => api.put(`/api/admin/operators/${personId}`, data),
+  updateOperatorConfig: (personId, data) => api.patch(`/api/admin/operators/${personId}/config`, data),
   pauseOperator: (personId, data) => api.post(`/api/admin/operators/${personId}/pause`, data),
   resumeOperator: (personId) => api.post(`/api/admin/operators/${personId}/resume`),
   createOperator: (data) => api.post('/api/admin/operators/create', data),

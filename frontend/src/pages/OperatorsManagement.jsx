@@ -17,9 +17,17 @@ export default function OperatorsManagement() {
   const [loading, setLoading] = useState(true)
   const [editingOperator, setEditingOperator] = useState(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [activeScheduleTab, setActiveScheduleTab] = useState('work')
   const [newSchedule, setNewSchedule] = useState(null)
   const [editingSchedule, setEditingSchedule] = useState(null)
+  const [configForm, setConfigForm] = useState({
+    is_paused: false,
+    assignment_paused: false,
+    notifications_enabled: true,
+    whatsapp_number: '',
+    paused_reason: ''
+  })
   const { toast } = useToast()
 
   const daysOfWeek = [
@@ -51,6 +59,39 @@ export default function OperatorsManagement() {
   useEffect(() => {
     fetchOperators()
   }, [])
+
+  const handleOpenConfig = (operator) => {
+    setEditingOperator(operator)
+    setConfigForm({
+      is_paused: operator.is_paused || false,
+      assignment_paused: operator.assignment_paused || false,
+      notifications_enabled: operator.notifications_enabled !== false,
+      whatsapp_number: operator.whatsapp_number || '',
+      paused_reason: operator.paused_reason || ''
+    })
+    setConfigDialogOpen(true)
+  }
+
+  const handleSaveConfig = async () => {
+    try {
+      await adminApi.updateOperatorConfig(editingOperator.person_id, {
+        ...configForm,
+        paused_by: 'admin'
+      })
+      toast({
+        title: 'Configuración Actualizada',
+        description: `Configuración de ${editingOperator.name} actualizada exitosamente`
+      })
+      setConfigDialogOpen(false)
+      fetchOperators()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error al actualizar configuración',
+        variant: 'destructive'
+      })
+    }
+  }
 
   const handlePauseOperator = async (personId, name) => {
     const reason = prompt(`¿Por qué deseas pausar a ${name}?`)
@@ -370,40 +411,34 @@ export default function OperatorsManagement() {
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    <Button
+                      onClick={() => handleOpenConfig(operator)}
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      title="Configuración completa"
+                    >
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      Configurar
+                    </Button>
+
                     {operator.is_paused ? (
                       <Button
                         onClick={() => handleResumeOperator(operator.person_id, operator.name)}
                         size="sm"
                         variant="default"
-                        className="flex-1"
                       >
-                        <Play className="h-4 w-4 mr-2" />
-                        Reanudar
+                        <Play className="h-4 w-4" />
                       </Button>
                     ) : (
                       <Button
                         onClick={() => handlePauseOperator(operator.person_id, operator.name)}
                         size="sm"
                         variant="outline"
-                        className="flex-1"
                       >
-                        <Pause className="h-4 w-4 mr-2" />
-                        Pausar
+                        <Pause className="h-4 w-4" />
                       </Button>
                     )}
-
-                    <Button
-                      onClick={() => handleToggleNotifications(operator.person_id, operator.name, operator.notifications_enabled)}
-                      size="sm"
-                      variant="outline"
-                      title={operator.notifications_enabled ? 'Silenciar notificaciones' : 'Activar notificaciones'}
-                    >
-                      {operator.notifications_enabled ? (
-                        <BellOff className="h-4 w-4" />
-                      ) : (
-                        <Bell className="h-4 w-4" />
-                      )}
-                    </Button>
 
                     <Button
                       onClick={() => {
@@ -412,9 +447,9 @@ export default function OperatorsManagement() {
                       }}
                       size="sm"
                       variant="outline"
-                      title="Editar teléfono"
+                      title="Editar horarios"
                     >
-                      <Phone className="h-4 w-4" />
+                      <Edit2 className="h-4 w-4" />
                     </Button>
 
                     <Button
@@ -718,6 +753,115 @@ export default function OperatorsManagement() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Config Operator Dialog - Pausas Granulares */}
+      <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configuración de {editingOperator?.name}</DialogTitle>
+            <DialogDescription>
+              Gestiona pausas y configuración del operador
+            </DialogDescription>
+          </DialogHeader>
+          {editingOperator && (
+            <div className="space-y-4">
+              {/* Número de WhatsApp */}
+              <div>
+                <Label htmlFor="config-whatsapp">Número de WhatsApp</Label>
+                <Input
+                  id="config-whatsapp"
+                  type="tel"
+                  value={configForm.whatsapp_number}
+                  onChange={(e) => setConfigForm({ ...configForm, whatsapp_number: e.target.value })}
+                  placeholder="+54 9 11 1234-5678"
+                />
+              </div>
+
+              {/* Pausa Total */}
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Pause className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <p className="font-medium">Pausar Todo</p>
+                    <p className="text-xs text-gray-500">Sin asignación ni notificaciones</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={configForm.is_paused}
+                  onChange={(e) => setConfigForm({ ...configForm, is_paused: e.target.checked })}
+                  className="w-4 h-4"
+                />
+              </div>
+
+              {/* Razón de Pausa */}
+              {configForm.is_paused && (
+                <div>
+                  <Label htmlFor="paused-reason">Razón de la pausa</Label>
+                  <Input
+                    id="paused-reason"
+                    value={configForm.paused_reason}
+                    onChange={(e) => setConfigForm({ ...configForm, paused_reason: e.target.value })}
+                    placeholder="Ej: no asignar de momento"
+                  />
+                </div>
+              )}
+
+              {/* Pausa de Asignación */}
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  <UserX className="h-4 w-4 text-blue-500" />
+                  <div>
+                    <p className="font-medium">Pausar Asignación</p>
+                    <p className="text-xs text-gray-500">No recibe tickets nuevos</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={configForm.assignment_paused}
+                  onChange={(e) => setConfigForm({ ...configForm, assignment_paused: e.target.checked })}
+                  className="w-4 h-4"
+                  disabled={configForm.is_paused}
+                />
+              </div>
+
+              {/* Notificaciones */}
+              <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-2">
+                  {configForm.notifications_enabled ? (
+                    <Bell className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <BellOff className="h-4 w-4 text-gray-400" />
+                  )}
+                  <div>
+                    <p className="font-medium">Notificaciones</p>
+                    <p className="text-xs text-gray-500">Alertas de WhatsApp</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={configForm.notifications_enabled}
+                  onChange={(e) => setConfigForm({ ...configForm, notifications_enabled: e.target.checked })}
+                  className="w-4 h-4"
+                  disabled={configForm.is_paused}
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <Button variant="outline" onClick={() => setConfigDialogOpen(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button onClick={handleSaveConfig}>
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Operator Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

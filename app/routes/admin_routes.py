@@ -269,6 +269,83 @@ def resume_operator(person_id):
         }), 500
 
 
+@admin_bp.route('/operators/<int:person_id>/config', methods=['PATCH'])
+def update_operator_config(person_id):
+    """Update operator configuration (pausas granulares, número de WhatsApp, etc)."""
+    try:
+        data = request.get_json()
+        
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+        if not operator:
+            return jsonify({
+                'success': False,
+                'error': 'Operator not found'
+            }), 404
+        
+        old_values = {
+            'is_paused': operator.is_paused,
+            'assignment_paused': operator.assignment_paused,
+            'notifications_enabled': operator.notifications_enabled,
+            'whatsapp_number': operator.whatsapp_number
+        }
+        
+        # Actualizar campos según lo enviado
+        if 'is_paused' in data:
+            operator.is_paused = data['is_paused']
+            if data['is_paused']:
+                operator.paused_at = datetime.now()
+                operator.paused_reason = data.get('paused_reason', 'Pausa manual')
+                operator.paused_by = data.get('paused_by', 'admin')
+        
+        if 'assignment_paused' in data:
+            operator.assignment_paused = data['assignment_paused']
+        
+        if 'notifications_enabled' in data:
+            operator.notifications_enabled = data['notifications_enabled']
+        
+        if 'whatsapp_number' in data:
+            operator.whatsapp_number = data['whatsapp_number']
+        
+        db.session.commit()
+        
+        new_values = {
+            'is_paused': operator.is_paused,
+            'assignment_paused': operator.assignment_paused,
+            'notifications_enabled': operator.notifications_enabled,
+            'whatsapp_number': operator.whatsapp_number
+        }
+        
+        log_audit(
+            action='update_operator_config',
+            entity_type='operator',
+            entity_id=str(person_id),
+            old_value=old_values,
+            new_value=new_values,
+            notes=f"Updated config for operator {operator.name}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Operator {operator.name} config updated successfully',
+            'operator': {
+                'person_id': operator.person_id,
+                'name': operator.name,
+                'is_paused': operator.is_paused,
+                'assignment_paused': operator.assignment_paused,
+                'notifications_enabled': operator.notifications_enabled,
+                'whatsapp_number': operator.whatsapp_number
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating operator config: {e}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @admin_bp.route('/operators/create', methods=['POST'])
 def create_operator():
     """Create a new operator."""

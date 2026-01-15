@@ -79,11 +79,12 @@ class OperatorConfig(db.Model):
     name = db.Column(db.String(200), nullable=False)
     whatsapp_number = db.Column(db.String(50))
     is_active = db.Column(db.Boolean, default=True)
-    is_paused = db.Column(db.Boolean, default=False)
+    is_paused = db.Column(db.Boolean, default=False)  # Pausa general (todo)
     paused_reason = db.Column(db.Text)
     paused_at = db.Column(db.DateTime)
     paused_by = db.Column(db.String(100))
-    notifications_enabled = db.Column(db.Boolean, default=True)
+    notifications_enabled = db.Column(db.Boolean, default=True)  # Pausa de notificaciones
+    assignment_paused = db.Column(db.Boolean, default=False)  # Pausa solo asignación de tickets
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
 
