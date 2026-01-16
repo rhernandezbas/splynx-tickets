@@ -134,7 +134,9 @@ def sync_tickets_status():
                         
                         # Marcar como cerrado
                         ticket.is_closed = True
-                        ticket.exceeded_threshold = False  # Los cerrados no están vencidos
+                        # IMPORTANTE: NO resetear exceeded_threshold al cerrar
+                        # Mantener el valor para cálculo de SLA y observabilidad
+                        # Si estuvo vencido, debe permanecer vencido para las métricas
                         
                         # Actualizar estado basado en status_id
                         if status_id == '3':
@@ -143,7 +145,7 @@ def sync_tickets_status():
                             ticket.Estado = 'CLOSED'
                         
                         closed_count += 1
-                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, is_closed=True, status_id={status_id}, updated_at={updated_at})")
+                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, is_closed=True, exceeded_threshold={ticket.exceeded_threshold}, status_id={status_id})")
                     else:
                         # Ticket aún abierto
                         ticket.is_closed = False
