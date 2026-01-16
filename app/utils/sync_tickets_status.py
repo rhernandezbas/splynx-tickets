@@ -9,9 +9,13 @@ from app.models.models import IncidentsDetection
 from app.services.splynx_services import SplynxServices
 from app.utils.config_helper import ConfigHelper
 from datetime import datetime
+import pytz
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Timezone de Argentina
+ARGENTINA_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
 def parse_date(date_str):
     """Parse DD-MM-YYYY HH:MM:SS format to datetime"""
@@ -89,8 +93,14 @@ def sync_tickets_status():
                         last_update = parse_date(ticket.Fecha_Creacion)
                     
                     if last_update:
-                        now = datetime.now()
-                        time_since_update = int((now - last_update).total_seconds() / 60)
+                        # Usar hora de Argentina para el cálculo
+                        now_argentina = datetime.now(ARGENTINA_TZ)
+                        
+                        # Si last_update no tiene timezone, asumimos que es Argentina
+                        if last_update.tzinfo is None:
+                            last_update = ARGENTINA_TZ.localize(last_update)
+                        
+                        time_since_update = int((now_argentina - last_update).total_seconds() / 60)
                         ticket.response_time_minutes = time_since_update
                         
                         # Verificar si excede el threshold desde última actualización
