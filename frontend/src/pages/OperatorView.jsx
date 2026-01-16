@@ -312,23 +312,9 @@ export default function OperatorView() {
             <div className="space-y-2">
               {overdueTickets.slice(0, 5).map(ticket => (
                 <div key={ticket.id} className="bg-white p-3 rounded border border-red-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-red-700">#{ticket.ticket_id}</span>
-                      <span className="text-xs text-red-600">{ticket.prioridad}</span>
-                    </div>
-                    <Button
-                      onClick={() => {
-                        setSelectedTicketForAudit(ticket)
-                        setAuditModalOpen(true)
-                      }}
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                    >
-                      <FileSearch className="h-3 w-3 mr-1" />
-                      Auditar
-                    </Button>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs text-red-700">#{ticket.ticket_id}</span>
+                    <span className="text-xs text-red-600">{ticket.prioridad}</span>
                   </div>
                   <p className="text-sm text-gray-700 truncate">{ticket.asunto}</p>
                   <p className="text-xs text-gray-500 mt-1">{ticket.cliente}</p>
@@ -499,6 +485,7 @@ export default function OperatorView() {
                   <th className="text-left p-2 font-medium">Estado</th>
                   <th className="text-left p-2 font-medium">Prioridad</th>
                   <th className="text-left p-2 font-medium">Asignado</th>
+                  <th className="text-left p-2 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -529,11 +516,27 @@ export default function OperatorView() {
                       <td className="p-2 text-xs text-gray-600">
                         {new Date(ticket.assigned_at).toLocaleString()}
                       </td>
+                      <td className="p-2">
+                        {ticket.exceeded_threshold && !ticket.is_closed && (
+                          <Button
+                            onClick={() => {
+                              setSelectedTicketForAudit(ticket)
+                              setAuditModalOpen(true)
+                            }}
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                          >
+                            <FileSearch className="h-3 w-3 mr-1" />
+                            Auditar
+                          </Button>
+                        )}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="p-8 text-center text-muted-foreground">
+                    <td colSpan="7" className="p-8 text-center text-muted-foreground">
                       No tienes tickets asignados actualmente
                     </td>
                   </tr>

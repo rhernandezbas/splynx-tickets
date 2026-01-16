@@ -75,15 +75,26 @@ def sync_tickets_status():
                     else:
                         new_assigned_to = None
                     
-                    # Calcular tiempo de respuesta
-                    created_date = parse_date(ticket.Fecha_Creacion)
-                    if created_date:
+                    # Calcular tiempo desde última actualización (no desde creación)
+                    # Si el ticket fue respondido/actualizado, el contador se resetea
+                    last_update = None
+                    if updated_at:
+                        try:
+                            last_update = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+                        except ValueError:
+                            last_update = None
+                    
+                    # Si no hay updated_at, usar fecha de creación como fallback
+                    if not last_update:
+                        last_update = parse_date(ticket.Fecha_Creacion)
+                    
+                    if last_update:
                         now = datetime.now()
-                        response_time = int((now - created_date).total_seconds() / 60)
-                        ticket.response_time_minutes = response_time
+                        time_since_update = int((now - last_update).total_seconds() / 60)
+                        ticket.response_time_minutes = time_since_update
                         
-                        # Verificar si excede el threshold
-                        if response_time > threshold_minutes and not is_closed:
+                        # Verificar si excede el threshold desde última actualización
+                        if time_since_update > threshold_minutes and not is_closed:
                             ticket.exceeded_threshold = True
                             exceeded_count += 1
                         else:
