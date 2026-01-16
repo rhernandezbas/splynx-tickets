@@ -1130,11 +1130,6 @@ def delete_ticket(ticket_id):
                 'error': 'Ticket no encontrado'
             }), 404
         
-        # Eliminar también de ticket_response_metrics si existe
-        metric = TicketResponseMetrics.query.filter_by(ticket_id=ticket_id).first()
-        if metric:
-            db.session.delete(metric)
-        
         # Eliminar el ticket
         db.session.delete(ticket)
         db.session.commit()

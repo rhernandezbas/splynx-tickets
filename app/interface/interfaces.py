@@ -338,153 +338,49 @@ class AssignmentTrackerInterface(BaseInterface):
 
 
 class TicketResponseMetricsInterface(BaseInterface):
-    """Interface for TicketResponseMetrics model."""
+    """DEPRECATED: Interface for TicketResponseMetrics model. 
+    All data now stored in IncidentsDetection table.
+    These methods are stubs to prevent errors in existing code."""
     
     @staticmethod
     def create(data: Dict[str, Any]) -> Optional[TicketResponseMetrics]:
-        """Create a new ticket response metric."""
-        try:
-            from datetime import datetime
-            metric = TicketResponseMetrics(
-                ticket_id=data.get('ticket_id'),
-                assigned_to=data.get('assigned_to'),
-                customer_id=data.get('customer_id'),
-                customer_name=data.get('customer_name'),
-                subject=data.get('subject'),
-                created_at=data.get('created_at'),
-                first_alert_sent_at=data.get('first_alert_sent_at'),
-                last_alert_sent_at=data.get('last_alert_sent_at'),
-                response_time_minutes=data.get('response_time_minutes'),
-                alert_count=data.get('alert_count', 0),
-                resolved_at=data.get('resolved_at'),
-                exceeded_threshold=data.get('exceeded_threshold', True)
-            )
-            if BaseInterface.add_item(metric):
-                return metric
-            return None
-        except Exception as e:
-            logger.error(f"Error creating ticket metric: {str(e)}")
-            return None
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        logger.debug(f"TicketResponseMetricsInterface.create called (deprecated, no-op)")
+        return None
     
     @staticmethod
     def get_by_ticket_id(ticket_id: str) -> Optional[TicketResponseMetrics]:
-        """Get metric by ticket ID."""
-        try:
-            return TicketResponseMetrics.query.filter_by(ticket_id=ticket_id).first()
-        except SQLAlchemyError as e:
-            logger.error(f"Error getting metric by ticket ID: {str(e)}")
-            return None
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        return None
     
     @staticmethod
     def update_alert_sent(ticket_id: str, response_time_minutes: int, assigned_to: int = None, 
                          customer_id: str = None, customer_name: str = None, 
                          subject: str = None, created_at = None) -> bool:
-        """Update alert sent timestamp and increment alert count. Creates metric if doesn't exist."""
-        try:
-            from datetime import datetime
-            import pytz
-            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
-            # Usar timezone de Argentina para evitar problemas de comparación
-            tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
-            now = datetime.now(tz_argentina)
-            
-            if metric:
-                # Actualizar métrica existente
-                metric.last_alert_sent_at = now
-                metric.alert_count += 1
-                metric.response_time_minutes = response_time_minutes
-                logger.debug(f"      📝 Actualizando ticket {ticket_id}: last_alert={now}, count={metric.alert_count}")
-            else:
-                # Crear métrica nueva si no existe
-                logger.debug(f"      🆕 Creando nueva métrica para ticket {ticket_id}")
-                metric = TicketResponseMetrics(
-                    ticket_id=ticket_id,
-                    assigned_to=assigned_to,
-                    customer_id=customer_id,
-                    customer_name=customer_name,
-                    subject=subject,
-                    created_at=created_at or now,
-                    first_alert_sent_at=now,
-                    last_alert_sent_at=now,
-                    response_time_minutes=response_time_minutes,
-                    alert_count=1,
-                    exceeded_threshold=True
-                )
-                from app.utils.config import db
-                db.session.add(metric)
-            
-            commit_result = BaseInterface.commit_changes()
-            if not commit_result:
-                logger.error(f"      ❌ Commit falló para ticket {ticket_id}")
-            return commit_result
-        except Exception as e:
-            logger.error(f"      ❌ Error updating alert sent para ticket {ticket_id}: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return False
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        logger.debug(f"TicketResponseMetricsInterface.update_alert_sent called for ticket {ticket_id} (deprecated, no-op)")
+        return True
     
     @staticmethod
     def add_assignment_to_history(ticket_id: str, assigned_to: int, reason: str = "assigned") -> bool:
-        """Add assignment entry to history."""
-        try:
-            from datetime import datetime
-            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
-            if metric:
-                # Inicializar historial si es None o vacío
-                if metric.assignment_history is None:
-                    metric.assignment_history = []
-                
-                # Agregar nueva entrada al historial
-                assignment_entry = {
-                    "assigned_to": assigned_to,
-                    "assigned_at": datetime.now().isoformat(),
-                    "reason": reason
-                }
-                metric.assignment_history.append(assignment_entry)
-                
-                # Actualizar assigned_to actual
-                metric.assigned_to = assigned_to
-                
-                logger.debug(f"      📋 Historial actualizado: {len(metric.assignment_history)} asignaciones para ticket {ticket_id}")
-                return BaseInterface.commit_changes()
-            return False
-        except Exception as e:
-            logger.error(f"Error adding assignment to history: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return False
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        logger.debug(f"TicketResponseMetricsInterface.add_assignment_to_history called for ticket {ticket_id} (deprecated, no-op)")
+        return True
     
     @staticmethod
     def mark_resolved(ticket_id: str) -> bool:
-        """Mark ticket as resolved."""
-        try:
-            from datetime import datetime
-            metric = TicketResponseMetricsInterface.get_by_ticket_id(ticket_id)
-            if metric:
-                metric.resolved_at = datetime.now()
-                metric.is_closed = True
-            return BaseInterface.commit_changes()
-        except Exception as e:
-            logger.error(f"Error marking ticket as resolved: {str(e)}")
-            return False
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        return True
     
     @staticmethod
     def get_metrics_by_person(person_id: int) -> List[TicketResponseMetrics]:
-        """Get all metrics for a specific person."""
-        try:
-            return TicketResponseMetrics.query.filter_by(assigned_to=person_id).all()
-        except SQLAlchemyError as e:
-            logger.error(f"Error getting metrics by person: {str(e)}")
-            return []
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        return []
     
     @staticmethod
     def get_unresolved_metrics() -> List[TicketResponseMetrics]:
-        """Get all unresolved ticket metrics using is_closed."""
-        try:
-            return TicketResponseMetrics.query.filter_by(is_closed=False).all()
-        except SQLAlchemyError as e:
-            logger.error(f"Error getting unresolved metrics: {str(e)}")
-            return []
+        """DEPRECATED: No-op stub. Data now in IncidentsDetection."""
+        return []
 
 
 class OperatorConfigInterface(BaseInterface):
