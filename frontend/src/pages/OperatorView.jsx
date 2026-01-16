@@ -206,8 +206,8 @@ export default function OperatorView() {
     )
   }
 
-  const openTickets = myTickets.filter(t => t.estado === 'Abierto' || t.estado === 'En Progreso')
-  const closedTickets = myTickets.filter(t => t.estado === 'Cerrado')
+  const openTickets = myTickets.filter(t => !t.is_closed)
+  const closedTickets = myTickets.filter(t => t.is_closed)
 
   const overdueTickets = myTickets.filter(t => t.exceeded_threshold && !t.is_closed)
 
