@@ -108,12 +108,18 @@ def sync_tickets_status():
                         time_since_update = int((now_argentina - last_update).total_seconds() / 60)
                         ticket.response_time_minutes = time_since_update
                         
-                        # Verificar si excede el threshold desde última actualización
-                        if time_since_update > threshold_minutes and not is_closed:
-                            ticket.exceeded_threshold = True
-                            exceeded_count += 1
-                        else:
-                            ticket.exceeded_threshold = False
+                        # IMPORTANTE: exceeded_threshold persiste una vez activado
+                        # Solo se puede desactivar cuando el ticket se cierra
+                        if not is_closed:
+                            # Si ya estaba vencido, mantenerlo vencido
+                            if ticket.exceeded_threshold:
+                                exceeded_count += 1
+                            # Si no estaba vencido, verificar si ahora excede el threshold
+                            elif time_since_update > threshold_minutes:
+                                ticket.exceeded_threshold = True
+                                exceeded_count += 1
+                                logger.info(f"🔴 Ticket {ticket_id} marcado como VENCIDO (response_time={time_since_update}min > {threshold_minutes}min)")
+                        # Si está cerrado, se manejará más abajo
                     
                     # Si el ticket está cerrado en Splynx (closed = "1")
                     if is_closed:
