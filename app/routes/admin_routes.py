@@ -743,17 +743,18 @@ def get_dashboard_stats():
         trackers = AssignmentTrackerInterface.get_all()
         total_assignments = sum(t.ticket_count for t in trackers)
         
-        unresolved_metrics = TicketResponseMetricsInterface.get_unresolved_metrics()
-        overdue_tickets = len([m for m in unresolved_metrics if m.exceeded_threshold])
+        # Usar IncidentsDetection en lugar de TicketResponseMetrics
+        unresolved_tickets = IncidentsDetection.query.filter_by(is_closed=False).all()
+        overdue_tickets = len([t for t in unresolved_tickets if t.exceeded_threshold])
         
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_metrics = db.session.query(TicketResponseMetrics).filter(
-            TicketResponseMetrics.created_at >= today_start
+        today_tickets = IncidentsDetection.query.filter(
+            IncidentsDetection.Fecha_Creacion >= today_start
         ).all()
         
         avg_response_time = 0
-        if today_metrics:
-            response_times = [m.response_time_minutes for m in today_metrics if m.response_time_minutes]
+        if today_tickets:
+            response_times = [t.response_time_minutes for t in today_tickets if t.response_time_minutes]
             if response_times:
                 avg_response_time = sum(response_times) / len(response_times)
         
@@ -761,8 +762,9 @@ def get_dashboard_stats():
         for tracker in trackers:
             operator = OperatorConfigInterface.get_by_person_id(tracker.person_id)
             if operator:
-                metrics = TicketResponseMetricsInterface.get_metrics_by_person(tracker.person_id)
-                unresolved = [m for m in metrics if not m.is_closed]
+                # Obtener tickets del operador desde IncidentsDetection
+                operator_tickets = IncidentsDetection.query.filter_by(assigned_to=tracker.person_id).all()
+                unresolved = [t for t in operator_tickets if not t.is_closed]
                 
                 operator_stats.append({
                     'person_id': tracker.person_id,
@@ -770,9 +772,9 @@ def get_dashboard_stats():
                     'is_active': operator.is_active,
                     'is_paused': operator.is_paused,
                     'current_assignments': tracker.ticket_count,
-                    'total_handled': len(metrics),
+                    'total_handled': len(operator_tickets),
                     'unresolved': len(unresolved),
-                    'avg_response_time': sum(m.response_time_minutes for m in metrics if m.response_time_minutes) / len(metrics) if metrics else 0
+                    'avg_response_time': sum(t.response_time_minutes for t in operator_tickets if t.response_time_minutes) / len(operator_tickets) if operator_tickets else 0
                 })
         
         from app.utils.system_control import SystemControl
@@ -793,10 +795,10 @@ def get_dashboard_stats():
                 },
                 'assignments': {
                     'total': total_assignments,
-                    'today': len(today_metrics)
+                    'today': len(today_tickets)
                 },
                 'tickets': {
-                    'unresolved': len(unresolved_metrics),
+                    'unresolved': len(unresolved_tickets),
                     'overdue': overdue_tickets,
                     'avg_response_time_minutes': round(avg_response_time, 2)
                 },
