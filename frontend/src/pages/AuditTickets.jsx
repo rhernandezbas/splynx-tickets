@@ -31,7 +31,7 @@ export default function AuditTickets() {
       await adminApi.approveAudit(ticketId)
       toast({
         title: '✅ Auditoría aprobada',
-        description: `Ticket #${ticketId} aprobado. El operador será notificado.`
+        description: `Ticket #${ticketId} aprobado. Contadores de exceeded_threshold reseteados.`
       })
       fetchAuditTickets()
     } catch (error) {
@@ -48,7 +48,7 @@ export default function AuditTickets() {
       await adminApi.rejectAudit(ticketId)
       toast({
         title: '⚠️ Auditoría rechazada',
-        description: `Ticket #${ticketId} rechazado. El operador será notificado.`
+        description: `Ticket #${ticketId} rechazado. No se modificaron contadores.`
       })
       fetchAuditTickets()
     } catch (error) {
@@ -61,21 +61,22 @@ export default function AuditTickets() {
   }
 
   const handleDelete = async (ticketId) => {
-    if (!confirm(`¿Estás seguro de eliminar la solicitud de auditoría del ticket #${ticketId}?`)) {
+    if (!confirm(`¿Estás seguro de eliminar este ticket de la vista de auditoría?`)) {
       return
     }
     
     try {
       await adminApi.deleteAudit(ticketId)
       toast({
-        title: '🗑️ Auditoría eliminada',
-        description: `Solicitud de auditoría del ticket #${ticketId} eliminada de la base de datos.`
+        title: '👁️ Ticket ocultado',
+        description: `Ticket #${ticketId} eliminado de la vista de auditoría.`
       })
       fetchAuditTickets()
     } catch (error) {
+      const errorMessage = error.response?.data?.error || 'No se pudo eliminar la auditoría'
       toast({
         title: 'Error',
-        description: 'No se pudo eliminar la auditoría',
+        description: errorMessage,
         variant: 'destructive'
       })
     }
@@ -320,8 +321,9 @@ export default function AuditTickets() {
         </CardHeader>
         <CardContent className="text-sm text-blue-800 space-y-2">
           <p>• 🔍 Los operadores pueden marcar tickets vencidos para auditoría</p>
-          <p>• 📋 Esta página muestra todos los tickets solicitados para revisión manual</p>
-          <p>• ✅ Marca los tickets como "Revisado" después de procesarlos</p>
+          <p>• ✅ <strong>Aprobar:</strong> Resetea contadores de exceeded_threshold y alertas</p>
+          <p>• ❌ <strong>Rechazar:</strong> Solo marca como rechazado, no modifica contadores</p>
+          <p>• 🗑️ <strong>Eliminar:</strong> Oculta de esta vista (requiere aprobar/rechazar primero)</p>
           <p>• 🔄 La lista se actualiza automáticamente cada 30 segundos</p>
           <p>• 🔗 Puedes abrir cada ticket directamente en Splynx para gestionarlo</p>
         </CardContent>

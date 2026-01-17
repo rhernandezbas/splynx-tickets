@@ -1325,7 +1325,7 @@ def mark_audit_notified(ticket_id):
 
 @admin_bp.route('/tickets/<ticket_id>/approve-audit', methods=['POST'])
 def approve_audit(ticket_id):
-    """Approve audit request for a ticket."""
+    """Approve audit request for a ticket and reset exceeded_threshold counters."""
     try:
         from datetime import datetime
         from flask import session
@@ -1344,20 +1344,25 @@ def approve_audit(ticket_id):
         ticket.audit_reviewed_by = session.get('user_id')
         ticket.audit_notified = True
         
+        # NUEVO: Resetear exceeded_threshold y contadores de alertas
+        ticket.exceeded_threshold = False
+        ticket.first_alert_sent_at = None
+        ticket.last_alert_sent_at = None
+        
         db.session.commit()
         
         log_audit(
             action='approve_audit',
             entity_type='ticket',
             entity_id=ticket_id,
-            notes=f"Admin aprobó auditoría para ticket {ticket_id}"
+            notes=f"Admin aprobó auditoría para ticket {ticket_id} - Contadores reseteados"
         )
         
-        logger.info(f"✅ Auditoría aprobada para ticket {ticket_id}")
+        logger.info(f"✅ Auditoría aprobada para ticket {ticket_id} - Contadores reseteados")
         
         return jsonify({
             'success': True,
-            'message': 'Auditoría aprobada'
+            'message': 'Auditoría aprobada y contadores reseteados'
         }), 200
         
     except Exception as e:
@@ -1371,7 +1376,7 @@ def approve_audit(ticket_id):
 
 @admin_bp.route('/tickets/<ticket_id>/reject-audit', methods=['POST'])
 def reject_audit(ticket_id):
-    """Reject audit request for a ticket."""
+    """Reject audit request for a ticket - No hace cambios, solo marca como rechazado."""
     try:
         from datetime import datetime
         from flask import session
@@ -1384,11 +1389,12 @@ def reject_audit(ticket_id):
                 'error': 'Ticket no encontrado'
             }), 404
         
-        # Marcar como rechazado
+        # MODIFICADO: Solo marcar como rechazado, NO resetear contadores
         ticket.audit_status = 'rejected'
         ticket.audit_reviewed_at = datetime.now()
         ticket.audit_reviewed_by = session.get('user_id')
         ticket.audit_notified = True
+        # NO se modifica exceeded_threshold ni alertas
         
         db.session.commit()
         
@@ -1396,10 +1402,10 @@ def reject_audit(ticket_id):
             action='reject_audit',
             entity_type='ticket',
             entity_id=ticket_id,
-            notes=f"Admin rechazó auditoría para ticket {ticket_id}"
+            notes=f"Admin rechazó auditoría para ticket {ticket_id} - Sin cambios en contadores"
         )
         
-        logger.info(f"⚠️ Auditoría rechazada para ticket {ticket_id}")
+        logger.info(f"⚠️ Auditoría rechazada para ticket {ticket_id} - Sin cambios")
         
         return jsonify({
             'success': True,
@@ -1417,7 +1423,7 @@ def reject_audit(ticket_id):
 
 @admin_bp.route('/tickets/<ticket_id>/delete-audit', methods=['DELETE'])
 def delete_audit(ticket_id):
-    """Reset audit fields and exceeded_threshold for a ticket (mantiene ticket en BD para observabilidad)."""
+    """Oculta ticket de auditoría - Requiere que esté aprobado o rechazado previamente."""
     try:
         ticket = IncidentsDetection.query.filter_by(Ticket_ID=ticket_id).first()
         
@@ -1427,30 +1433,33 @@ def delete_audit(ticket_id):
                 'error': 'Ticket no encontrado'
             }), 404
         
-        # Resetear campos de auditoría y exceeded_threshold
-        ticket.audit_requested = False
-        ticket.audit_notified = False
-        ticket.audit_requested_at = None
-        ticket.audit_requested_by = None
-        ticket.audit_status = None
-        ticket.audit_reviewed_at = None
-        ticket.audit_reviewed_by = None
-        ticket.exceeded_threshold = False  # Resetear también el threshold
+        # NUEVO: Verificar que el ticket esté aprobado o rechazado
+        if ticket.audit_status not in ['approved', 'rejected']:
+            return jsonify({
+                'success': False,
+                'error': 'Debe aprobar o rechazar el ticket antes de eliminarlo de la vista de auditoría'
+            }), 400
+        
+        # MODIFICADO: Marcar como eliminado de auditoría (no resetear campos)
+        # Agregar flag para ocultar de la vista de auditoría
+        ticket.audit_requested = False  # Ocultar de la lista de auditoría
+        # Mantener audit_status, audit_reviewed_at, audit_reviewed_by para historial
+        # NO resetear exceeded_threshold - se mantiene el estado
         
         db.session.commit()
         
         log_audit(
-            action='reset_audit',
+            action='hide_from_audit',
             entity_type='ticket',
             entity_id=ticket_id,
-            notes=f"Admin reseteó auditoría y exceeded_threshold del ticket {ticket_id} (ticket mantenido para observabilidad)"
+            notes=f"Admin ocultó ticket {ticket_id} de la vista de auditoría (estado: {ticket.audit_status})"
         )
         
-        logger.info(f"🔄 Ticket {ticket_id}: auditoría y exceeded_threshold reseteados (ticket mantenido en BD)")
+        logger.info(f"👁️ Ticket {ticket_id}: ocultado de auditoría (estado mantenido: {ticket.audit_status})")
         
         return jsonify({
             'success': True,
-            'message': 'Auditoría y estado de vencimiento reseteados (ticket mantenido para observabilidad)'
+            'message': 'Ticket eliminado de la vista de auditoría'
         }), 200
         
     except Exception as e:
