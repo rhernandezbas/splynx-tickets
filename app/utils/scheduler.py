@@ -21,7 +21,11 @@ _scheduler_lock_file = '/tmp/splynx_scheduler.lock'
 
 def run_all_flow_job(app):
     """Ejecuta el flujo completo de tickets llamando al endpoint HTTP"""
-    from app.utils.constants import FINDE_HORA_INICIO, FINDE_HORA_FIN
+    from app.utils.config_helper import ConfigHelper
+    
+    # Obtener configuración de horarios desde BD
+    FINDE_HORA_INICIO = ConfigHelper.get_int('FINDE_HORA_INICIO', 9)
+    FINDE_HORA_FIN = ConfigHelper.get_int('FINDE_HORA_FIN', 21)
     
     # Obtener hora actual en Argentina
     tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')

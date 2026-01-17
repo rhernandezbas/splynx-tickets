@@ -1117,6 +1117,7 @@ class TicketManager:
             return resultado
     
     def get_operator_name(self, person_id: int) -> str:
-        """Obtiene el nombre del operador por su ID"""
-        from app.utils.constants import PERSON_NAMES
-        return PERSON_NAMES.get(person_id, f"Operador {person_id}")
+        """Obtiene el nombre del operador por su ID desde la BD"""
+        from app.models.models import OperatorConfig
+        operator = OperatorConfig.query.filter_by(person_id=person_id).first()
+        return operator.name if operator else f"Operador {person_id}"
