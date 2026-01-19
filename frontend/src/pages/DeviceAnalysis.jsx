@@ -831,7 +831,7 @@ export default function DeviceAnalysis() {
                         <CardTitle className="text-sm">Tiempo Promedio</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-3xl font-bold">{(stats.avg_execution_time_ms || 0).toFixed(0)}</p>
+                        <p className="text-3xl font-bold">{Number(stats.avg_execution_time_ms || 0).toFixed(0)}</p>
                         <p className="text-xs text-gray-500">milisegundos</p>
                       </CardContent>
                     </Card>
