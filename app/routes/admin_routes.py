@@ -1056,7 +1056,7 @@ def get_incidents():
                 'response_time_minutes': incident.response_time_minutes,
                 'exceeded_threshold': incident.exceeded_threshold or False,
                 'audit_requested': incident.audit_requested or False,
-                'audit_status': incident.audit_status or 'pending',
+                'audit_status': incident.audit_status,
                 'audit_notified': incident.audit_notified or False,
                 'audit_requested_at': incident.audit_requested_at.isoformat() if incident.audit_requested_at else None,
                 'audit_requested_by': incident.audit_requested_by,
@@ -1222,6 +1222,7 @@ def request_ticket_audit(ticket_id):
         ticket.audit_requested = True
         ticket.audit_requested_at = datetime.now()
         ticket.audit_requested_by = person_id
+        ticket.audit_status = 'pending'  # Establecer estado como pendiente
         ticket.audit_notified = False  # Resetear notificación
         
         db.session.commit()
