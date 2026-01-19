@@ -267,16 +267,23 @@ class TicketManager:
             
             # Verificar si el ticket ya existe en Splynx y está cerrado
             should_recreate = False
+            previous_assigned_to = None
             if ticket_id_bd:
                 try:
                     ticket_splynx = self.splynx.get_ticket_data_status(ticket_id_bd)
                     if ticket_splynx and ticket_splynx.get('status') in ['closed', 'Closed', '4']:
                         should_recreate = True
-                        logger.info(f"🔄 Ticket {ticket_id_bd} está cerrado en Splynx - Se recreará")
+                        previous_assigned_to = ticket_splynx.get('assign_to')
+                        logger.info(f"🔄 Ticket {ticket_id_bd} está cerrado en Splynx - Se recreará con operador {previous_assigned_to}")
                 except Exception as e:
                     logger.warning(f"⚠️  No se pudo verificar estado del ticket {ticket_id_bd}: {e}")
 
-            assigned_person_id = self.assign_ticket_fairly()
+            # Si es recreación, mantener el mismo operador. Si no, asignar nuevo operador
+            if should_recreate and previous_assigned_to:
+                assigned_person_id = int(previous_assigned_to)
+                logger.info(f"♻️  Manteniendo operador original: {assigned_person_id}")
+            else:
+                assigned_person_id = self.assign_ticket_fairly()
             
             # Usar el nombre del cliente desde la base de datos
             customer_name = cliente_nombre if cliente_nombre else "Cliente"
@@ -305,7 +312,7 @@ class TicketManager:
                 
                 recreado_count += 1
                 asunto_splynx = f"{asunto_splynx} [RECREADO x{recreado_count}]"
-                note_base = f"{note_base}\n\n⚠️ TICKET RECREADO (#{recreado_count}): El ticket anterior (ID: {ticket_id_bd}) fue cerrado pero el problema persiste en GR."
+                note_base = f"{note_base}\n\n⚠️ TICKET RECREADO (#{recreado_count}): El ticket anterior (ID: {ticket_id_bd}) fue cerrado pero el problema persiste en GR.\n♻️ Se mantiene el mismo operador asignado (ID: {assigned_person_id})."
             
             ticket_data = {
                 "Cliente": cliente,
