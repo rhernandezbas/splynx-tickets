@@ -125,10 +125,12 @@ export default function DeviceAnalysis() {
 
   const fetchLogsStats = async () => {
     try {
-      const response = await deviceAnalysisApi.getApiLogsStats({
+      // Obtener los logs para calcular estadísticas por nivel
+      const response = await deviceAnalysisApi.getApiLogs({
+        limit: 1000, // Obtener más logs para estadísticas precisas
         requested_by_role: userRole
       })
-      console.log('Logs stats response:', response.data)
+      console.log('Logs for stats response:', response.data)
       
       // Calcular estadísticas por nivel desde los logs
       const rawLogs = response.data.logs || []
@@ -141,12 +143,33 @@ export default function DeviceAnalysis() {
         else if (logString.includes('[DEBUG]')) levelCounts.DEBUG++
       })
       
+      // Obtener estadísticas generales de archivos
+      const statsResponse = await deviceAnalysisApi.getApiLogsStats({
+        requested_by_role: userRole
+      })
+      
+      // Combinar estadísticas de archivos con conteos por nivel
       setLogsStats({
-        ...response.data,
+        ...statsResponse.data,
+        total_lines_in_file: statsResponse.data.stats?.app?.total_lines || 0,
+        total_size_mb: statsResponse.data.stats?.app?.size_mb || 0,
+        lines_returned: rawLogs.length,
         by_level: levelCounts
       })
     } catch (error) {
       console.error('Error fetching logs stats:', error)
+      // Si hay error, establecer valores por defecto
+      setLogsStats({
+        total_lines_in_file: 0,
+        total_size_mb: 0,
+        lines_returned: 0,
+        by_level: {
+          ERROR: 0,
+          WARNING: 0,
+          INFO: 0,
+          DEBUG: 0
+        }
+      })
     }
   }
 
