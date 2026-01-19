@@ -11,7 +11,7 @@ export default function OperatorView() {
   const [operatorData, setOperatorData] = useState(null)
   const [myTickets, setMyTickets] = useState([])
   const [stats, setStats] = useState(null)
-  const [ticketFilter, setTicketFilter] = useState('open') // 'open', 'closed', 'all', 'overdue'
+  const [ticketFilter, setTicketFilter] = useState('open') // 'open', 'closed', 'all', 'overdue', 'audit_rejected'
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [auditModalOpen, setAuditModalOpen] = useState(false)
   const [selectedTicketForAudit, setSelectedTicketForAudit] = useState(null)
@@ -67,6 +67,12 @@ export default function OperatorView() {
             assigned_to: personId,
             ticket_status: 'all'
           })
+        } else if (ticketFilter === 'audit_rejected') {
+          // Para rechazados en auditoría, obtener todos y filtrar por audit_status
+          ticketsResponse = await adminApi.getIncidents({ 
+            assigned_to: personId,
+            ticket_status: 'all'
+          })
         } else {
           ticketsResponse = await adminApi.getIncidents({ 
             assigned_to: personId,
@@ -86,10 +92,12 @@ export default function OperatorView() {
           return new Date(`${year}-${month}-${day}`)
         }
         
-        // Filtrar vencidos si es necesario
+        // Filtrar según el tipo
         let filteredTickets = tickets
         if (ticketFilter === 'overdue') {
           filteredTickets = tickets.filter(t => t.exceeded_threshold)
+        } else if (ticketFilter === 'audit_rejected') {
+          filteredTickets = tickets.filter(t => t.audit_status === 'rejected')
         }
         
         // Transformar al formato esperado
@@ -104,7 +112,13 @@ export default function OperatorView() {
           assigned_at: ticket.created_at,
           is_closed: ticket.is_closed,
           closed_at: ticket.closed_at,
-          exceeded_threshold: ticket.exceeded_threshold
+          exceeded_threshold: ticket.exceeded_threshold,
+          audit_requested: ticket.audit_requested,
+          audit_status: ticket.audit_status,
+          audit_notified: ticket.audit_notified,
+          audit_requested_at: ticket.audit_requested_at,
+          audit_requested_by: ticket.audit_requested_by,
+          recreado: ticket.recreado || 0
         }))
         
         setMyTickets(formattedTickets)
@@ -210,6 +224,7 @@ export default function OperatorView() {
   const closedTickets = myTickets.filter(t => t.is_closed)
 
   const overdueTickets = myTickets.filter(t => t.exceeded_threshold && !t.is_closed)
+  const auditRejectedTickets = myTickets.filter(t => t.audit_status === 'rejected')
 
   return (
     <div className="space-y-6">
@@ -295,6 +310,46 @@ export default function OperatorView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Tickets Rechazados en Auditoría - Alerta */}
+      {auditRejectedTickets.length > 0 && (
+        <Card className="border-red-300 bg-red-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-900">
+              <AlertCircle className="h-5 w-5" />
+              ❌ Tickets Rechazados en Auditoría
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-800 mb-3">
+              Tienes <strong>{auditRejectedTickets.length}</strong> ticket(s) que fueron <strong>rechazados en auditoría</strong> y requieren tu atención.
+            </p>
+            <div className="space-y-2">
+              {auditRejectedTickets.slice(0, 5).map(ticket => (
+                <div key={ticket.id} className="bg-white p-3 rounded border border-red-200">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-mono text-xs text-red-700">#{ticket.ticket_id}</span>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      ❌ Rechazado en Auditoría
+                    </span>
+                    <span className="text-xs text-red-600">{ticket.prioridad}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 truncate">{ticket.asunto}</p>
+                  <p className="text-xs text-gray-500 mt-1">{ticket.cliente}</p>
+                  {ticket.audit_requested_at && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Rechazado el: {new Date(ticket.audit_requested_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {auditRejectedTickets.length > 5 && (
+                <p className="text-xs text-red-600 text-center">+ {auditRejectedTickets.length - 5} más</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tickets Vencidos - Alerta */}
       {overdueTickets.length > 0 && (
@@ -471,6 +526,14 @@ export default function OperatorView() {
               >
                 Vencidos
               </Button>
+              <Button
+                onClick={() => setTicketFilter('audit_rejected')}
+                variant={ticketFilter === 'audit_rejected' ? 'default' : 'outline'}
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+              >
+                ❌ Rechazados en Auditoría
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -543,8 +606,8 @@ export default function OperatorView() {
                             </span>
                           )}
                           {ticket.audit_requested && ticket.audit_status === 'rejected' && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              ❌ Rechazado
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 font-bold">
+                              ❌ Rechazado en Auditoría
                             </span>
                           )}
                           {ticket.audit_requested && ticket.audit_status === 'pending' && (
