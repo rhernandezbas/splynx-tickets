@@ -559,8 +559,8 @@ export default function OperatorView() {
                               ⏳ En revisión
                             </span>
                           )}
-                          {/* Botón Auditar solo si no ha solicitado auditoría */}
-                          {ticket.exceeded_threshold && !ticket.audit_requested && (
+                          {/* Botón Auditar solo si no ha solicitado auditoría y no tiene estado de auditoría */}
+                          {ticket.exceeded_threshold && !ticket.audit_requested && !ticket.audit_status && (
                             <Button
                               onClick={() => {
                                 setSelectedTicketForAudit(ticket)
