@@ -494,7 +494,18 @@ export default function OperatorView() {
                     <tr key={ticket.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 font-mono text-xs">{ticket.ticket_id}</td>
                       <td className="p-2">{ticket.cliente}</td>
-                      <td className="p-2 max-w-xs truncate">{ticket.asunto}</td>
+                      <td className="p-2 max-w-xs truncate">
+                        <div className="flex flex-col gap-1">
+                          <span className={ticket.recreado > 0 ? "text-red-600 font-semibold" : ""}>
+                            {ticket.asunto}
+                          </span>
+                          {ticket.recreado > 0 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              🔄 Recreado x{ticket.recreado}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2">
                         <div className="flex flex-col gap-1">
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

@@ -1059,7 +1059,8 @@ def get_incidents():
                 'audit_status': incident.audit_status or 'pending',
                 'audit_notified': incident.audit_notified or False,
                 'audit_requested_at': incident.audit_requested_at.isoformat() if incident.audit_requested_at else None,
-                'audit_requested_by': incident.audit_requested_by
+                'audit_requested_by': incident.audit_requested_by,
+                'recreado': incident.recreado or 0  # Agregar campo recreado
             }
             
             incidents_data.append(incident_dict)
