@@ -87,9 +87,30 @@ export default function DeviceAnalysis() {
         requested_by_role: userRole
       })
       console.log('Logs response:', response.data)
-      // La API puede devolver logs en diferentes estructuras
-      const logsData = response.data.logs || response.data.entries || response.data || []
-      setLogs(Array.isArray(logsData) ? logsData : [])
+      
+      // La API devuelve logs como strings, necesitamos parsearlos
+      const rawLogs = response.data.logs || []
+      const parsedLogs = rawLogs.map(logString => {
+        // Formato: "2026-01-19 01:47:36 [INFO] uvicorn.access:483 - mensaje"
+        const match = logString.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(INFO|WARNING|ERROR|DEBUG)\] (.+)$/)
+        
+        if (match) {
+          return {
+            timestamp: match[1],
+            level: match[2],
+            message: match[3]
+          }
+        }
+        
+        // Si no coincide con el formato, devolver como está
+        return {
+          timestamp: '',
+          level: 'INFO',
+          message: logString
+        }
+      })
+      
+      setLogs(parsedLogs)
     } catch (error) {
       console.error('Error fetching logs:', error)
       toast({
@@ -107,7 +128,23 @@ export default function DeviceAnalysis() {
       const response = await deviceAnalysisApi.getApiLogsStats({
         requested_by_role: userRole
       })
-      setLogsStats(response.data || null)
+      console.log('Logs stats response:', response.data)
+      
+      // Calcular estadísticas por nivel desde los logs
+      const rawLogs = response.data.logs || []
+      const levelCounts = { ERROR: 0, WARNING: 0, INFO: 0, DEBUG: 0 }
+      
+      rawLogs.forEach(logString => {
+        if (logString.includes('[ERROR]')) levelCounts.ERROR++
+        else if (logString.includes('[WARNING]')) levelCounts.WARNING++
+        else if (logString.includes('[INFO]')) levelCounts.INFO++
+        else if (logString.includes('[DEBUG]')) levelCounts.DEBUG++
+      })
+      
+      setLogsStats({
+        ...response.data,
+        by_level: levelCounts
+      })
     } catch (error) {
       console.error('Error fetching logs stats:', error)
     }
@@ -878,8 +915,8 @@ export default function DeviceAnalysis() {
                       <CardTitle className="text-sm">Total Logs</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-2xl font-bold">{logsStats.stats?.app?.total_lines || 0}</p>
-                      <p className="text-xs text-gray-500">{logsStats.stats?.app?.size_mb?.toFixed(2) || 0} MB</p>
+                      <p className="text-2xl font-bold">{logsStats.total_lines_in_file || logsStats.lines_returned || 0}</p>
+                      <p className="text-xs text-gray-500">{(logsStats.total_size_mb || 0).toFixed(2)} MB</p>
                     </CardContent>
                   </Card>
                   <Card>
