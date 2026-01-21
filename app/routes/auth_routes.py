@@ -321,3 +321,64 @@ def get_users_by_role(role):
     except Exception as e:
         logger.error(f"Error al obtener usuarios por rol: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@auth_bp.route('/users/<int:user_id>/permissions', methods=['PATCH'])
+@admin_required
+def update_user_permissions(user_id):
+    """Actualizar permisos de acceso a páginas de un usuario"""
+    try:
+        from app.models.models import User
+        
+        data = request.get_json()
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        # Guardar valores antiguos para auditoría
+        old_permissions = {
+            'can_access_operator_view': user.can_access_operator_view,
+            'can_access_device_analysis': user.can_access_device_analysis
+        }
+        
+        # Actualizar permisos enviados
+        if 'can_access_operator_view' in data:
+            user.can_access_operator_view = bool(data['can_access_operator_view'])
+        
+        if 'can_access_device_analysis' in data:
+            user.can_access_device_analysis = bool(data['can_access_device_analysis'])
+        
+        db.session.commit()
+        
+        # Registrar en auditoría
+        new_permissions = {
+            'can_access_operator_view': user.can_access_operator_view,
+            'can_access_device_analysis': user.can_access_device_analysis
+        }
+        
+        AuditLogInterface.create({
+            'action': 'update_permissions',
+            'entity_type': 'user',
+            'entity_id': user_id,
+            'old_value': old_permissions,
+            'new_value': new_permissions,
+            'performed_by': session.get('username'),
+            'ip_address': request.remote_addr,
+            'notes': f'Permisos actualizados para {user.username}'
+        })
+        
+        logger.info(f"✅ Permisos actualizados para usuario {user.username}")
+        
+        return jsonify({
+            'message': 'Permisos actualizados correctamente',
+            'permissions': {
+                'can_access_operator_view': user.can_access_operator_view,
+                'can_access_device_analysis': user.can_access_device_analysis
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error al actualizar permisos: {e}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

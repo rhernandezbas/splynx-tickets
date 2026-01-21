@@ -222,6 +222,10 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(100))
     
+    # Permisos de acceso a páginas
+    can_access_operator_view = db.Column(db.Boolean, default=True)  # Acceso a vista de operador
+    can_access_device_analysis = db.Column(db.Boolean, default=True)  # Acceso a análisis de dispositivos
+    
     def to_dict(self):
         """Convert to dictionary (sin password)"""
         return {
@@ -234,7 +238,9 @@ class User(db.Model):
             'is_active': self.is_active,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'created_by': self.created_by
+            'created_by': self.created_by,
+            'can_access_operator_view': self.can_access_operator_view,
+            'can_access_device_analysis': self.can_access_device_analysis
         }
 
 

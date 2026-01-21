@@ -161,6 +161,29 @@ export default function Users() {
     }
   }
 
+  const handleTogglePermission = async (userId, permission, value) => {
+    try {
+      await axios.patch(`${API_BASE_URL}/api/auth/users/${userId}/permissions`, {
+        [permission]: value
+      }, {
+        withCredentials: true
+      })
+      
+      toast({
+        title: 'Permiso actualizado',
+        description: `Permiso ${permission} ${value ? 'habilitado' : 'deshabilitado'}`
+      })
+      
+      fetchUsers()
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Error al actualizar permiso',
+        variant: 'destructive'
+      })
+    }
+  }
+
   const handleChangePassword = async (e) => {
     e.preventDefault()
     
@@ -300,6 +323,7 @@ export default function Users() {
                   <th className="text-left p-3 font-medium">Email</th>
                   <th className="text-left p-3 font-medium">Rol</th>
                   <th className="text-left p-3 font-medium">Person ID</th>
+                  <th className="text-left p-3 font-medium">Permisos</th>
                   <th className="text-left p-3 font-medium">Estado</th>
                   <th className="text-left p-3 font-medium">Último Login</th>
                   <th className="text-left p-3 font-medium">Acciones</th>
@@ -327,6 +351,34 @@ export default function Users() {
                       ) : (
                         <span className="text-gray-400 text-xs">Sin asignar</span>
                       )}
+                    </td>
+                    <td className="p-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`operator-view-${user.id}`}
+                            checked={user.can_access_operator_view !== false}
+                            onChange={(e) => handleTogglePermission(user.id, 'can_access_operator_view', e.target.checked)}
+                            className="h-4 w-4 text-blue-600 rounded"
+                          />
+                          <label htmlFor={`operator-view-${user.id}`} className="text-xs text-gray-700">
+                            Vista Operador
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`device-analysis-${user.id}`}
+                            checked={user.can_access_device_analysis !== false}
+                            onChange={(e) => handleTogglePermission(user.id, 'can_access_device_analysis', e.target.checked)}
+                            className="h-4 w-4 text-blue-600 rounded"
+                          />
+                          <label htmlFor={`device-analysis-${user.id}`} className="text-xs text-gray-700">
+                            Análisis Dispositivos
+                          </label>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-3">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
