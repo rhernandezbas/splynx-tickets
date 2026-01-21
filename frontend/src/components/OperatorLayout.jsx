@@ -8,15 +8,9 @@ import {
   ChevronRight,
   Radio
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
-
-const navigation = [
-  { name: 'Dashboard', href: '/operator-view', icon: LayoutDashboard },
-  // TODO: Descomentar cuando esté listo para operadores
-  // { name: 'Análisis de Dispositivos', href: '/operator-view/device-analysis', icon: Radio },
-]
 
 export default function OperatorLayout() {
   const location = useLocation()
@@ -24,6 +18,28 @@ export default function OperatorLayout() {
   const { toast } = useToast()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [navigation, setNavigation] = useState([
+    { name: 'Dashboard', href: '/operator-view', icon: LayoutDashboard }
+  ])
+
+  // Actualizar navegación según permisos del usuario
+  useEffect(() => {
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}')
+    const navItems = [
+      { name: 'Dashboard', href: '/operator-view', icon: LayoutDashboard }
+    ]
+    
+    // Agregar Device Analysis si tiene permisos
+    if (user.can_access_device_analysis !== false) {
+      navItems.push({
+        name: 'Análisis de Dispositivos', 
+        href: '/operator-view/device-analysis', 
+        icon: Radio
+      })
+    }
+    
+    setNavigation(navItems)
+  }, [])
 
   const handleLogout = () => {
     sessionStorage.clear()
