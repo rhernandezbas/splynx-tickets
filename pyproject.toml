@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "app-splynx"
-version = "1.1.0"
+version = "1.2.0"
 description = ""
 authors = ["rhernandezba <ronald.hernandezbastidas@mercadolibre.com>"]
 readme = "README.md"

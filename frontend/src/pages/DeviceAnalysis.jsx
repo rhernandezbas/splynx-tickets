@@ -27,18 +27,19 @@ import {
   FileText,
   Zap,
   Settings,
-  Power
+  Power,
+  Star
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 // Station Analyzer Class
 class StationAnalyzer {
-  constructor(baseUrl = 'http://190.7.234.37:7657/api/v1/stations') {
+  constructor(baseUrl = 'http://190.7.234.37:7657/api/v1') {
     this.baseUrl = baseUrl
   }
 
   async analyzeStation(ip, mac) {
-    const response = await fetch(`${this.baseUrl}/analyze`, {
+    const response = await fetch(`${this.baseUrl}/stations/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -57,7 +58,7 @@ class StationAnalyzer {
   }
 
   async enableFrequencies(ip, model) {
-    const response = await fetch(`${this.baseUrl}/enable-frequencies`, {
+    const response = await fetch(`${this.baseUrl}/stations/enable-frequencies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ip, model })
@@ -71,7 +72,7 @@ class StationAnalyzer {
   }
 
   async waitForConnection(ip, maxWaitTime = 360) {
-    const response = await fetch(`${this.baseUrl}/wait-for-connection`, {
+    const response = await fetch(`${this.baseUrl}/stations/wait-for-connection`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ip, max_wait_time: maxWaitTime })
@@ -85,10 +86,93 @@ class StationAnalyzer {
   }
 
   async getFlowStatus(ip) {
-    const response = await fetch(`${this.baseUrl}/flow-status/${ip}`)
+    const response = await fetch(`${this.baseUrl}/stations/flow-status/${ip}`)
     
     if (!response.ok) {
       throw new Error(`Error obteniendo estado: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  // Feedback Endpoints
+  async submitFeedback(analysisId, feedbackData) {
+    const response = await fetch(`${this.baseUrl}/feedback/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        analysis_id: analysisId,
+        ...feedbackData
+      })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Error enviando feedback: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  async getFeedbackList() {
+    const response = await fetch(`${this.baseUrl}/feedback/list`)
+    
+    if (!response.ok) {
+      throw new Error(`Error obteniendo feedback: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  async getFeedbackByAnalysis(analysisId) {
+    const response = await fetch(`${this.baseUrl}/feedback/analysis/${analysisId}/feedback`)
+    
+    if (!response.ok) {
+      throw new Error(`Error obteniendo feedback del análisis: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  // Logs Endpoints
+  async getLogs(filters = {}) {
+    const params = new URLSearchParams(filters)
+    const response = await fetch(`${this.baseUrl}/logs/?${params}`)
+    
+    if (!response.ok) {
+      throw new Error(`Error obteniendo logs: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  async getRecentLogs(limit = 50) {
+    const response = await fetch(`${this.baseUrl}/logs/recent?limit=${limit}`)
+    
+    if (!response.ok) {
+      throw new Error(`Error obteniendo logs recientes: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  async searchLogs(query, filters = {}) {
+    const params = new URLSearchParams({ q: query, ...filters })
+    const response = await fetch(`${this.baseUrl}/logs/search?${params}`)
+    
+    if (!response.ok) {
+      throw new Error(`Error buscando logs: ${response.statusText}`)
+    }
+    
+    return await response.json()
+  }
+
+  async clearLogs() {
+    const response = await fetch(`${this.baseUrl}/logs/clear`, {
+      method: 'DELETE'
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Error limpiando logs: ${response.statusText}`)
     }
     
     return await response.json()
@@ -106,6 +190,20 @@ export default function DeviceAnalysis() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [history, setHistory] = useState([])
   const [activeTab, setActiveTab] = useState('analyze')
+  
+  // Logs states
+  const [logs, setLogs] = useState([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const [logsSearchQuery, setLogsSearchQuery] = useState('')
+  const [logsFilters, setLogsFilters] = useState({
+    level: '',
+    limit: 100
+  })
+  
+  // Feedback states
+  const [feedbackList, setFeedbackList] = useState([])
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
+  
   const { toast } = useToast()
 
   const analyzer = new StationAnalyzer()
@@ -113,6 +211,10 @@ export default function DeviceAnalysis() {
   useEffect(() => {
     if (activeTab === 'history') {
       fetchHistory()
+    } else if (activeTab === 'logs') {
+      fetchLogs()
+    } else if (activeTab === 'feedback') {
+      fetchFeedbackList()
     }
   }, [activeTab])
 
@@ -141,6 +243,143 @@ export default function DeviceAnalysis() {
     const updatedHistory = [newEntry, ...history.slice(0, 49)] // Keep last 50
     setHistory(updatedHistory)
     localStorage.setItem('stationAnalysisHistory', JSON.stringify(updatedHistory))
+  }
+
+  // Logs functions
+  const fetchLogs = async () => {
+    setLogsLoading(true)
+    try {
+      const response = await analyzer.getLogs(logsFilters)
+      setLogs(response.data.logs || [])
+    } catch (error) {
+      console.error('Error fetching logs:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  const fetchRecentLogs = async () => {
+    setLogsLoading(true)
+    try {
+      const response = await analyzer.getRecentLogs(50)
+      setLogs(response.data.logs || [])
+    } catch (error) {
+      console.error('Error fetching recent logs:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  const searchLogs = async () => {
+    if (!logsSearchQuery.trim()) {
+      fetchLogs()
+      return
+    }
+    
+    setLogsLoading(true)
+    try {
+      const response = await analyzer.searchLogs(logsSearchQuery, logsFilters)
+      setLogs(response.data.logs || [])
+    } catch (error) {
+      console.error('Error searching logs:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  const clearLogs = async () => {
+    try {
+      await analyzer.clearLogs()
+      setLogs([])
+      toast({
+        title: 'Logs Limpiados',
+        description: 'Todos los logs han sido eliminados'
+      })
+    } catch (error) {
+      console.error('Error clearing logs:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    }
+  }
+
+  // Feedback functions
+  const fetchFeedbackList = async () => {
+    setFeedbackLoading(true)
+    try {
+      const response = await analyzer.getFeedbackList()
+      setFeedbackList(response.data.feedback || [])
+    } catch (error) {
+      console.error('Error fetching feedback list:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }
+
+  const handleFeedback = async () => {
+    if (!feedbackComment.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Por favor ingresa un comentario',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    try {
+      // Enviar feedback a la API
+      const feedbackData = {
+        comment: feedbackComment,
+        rating: 5, // Podrías agregar un selector de rating
+        user_agent: navigator.userAgent,
+        timestamp: new Date().toISOString()
+      }
+
+      if (analysisResult) {
+        // Si hay un análisis actual, asociar el feedback
+        await analyzer.submitFeedback(analysisResult.id || Date.now(), feedbackData)
+      }
+
+      setFeedbackSubmitted(true)
+      toast({
+        title: 'Gracias',
+        description: 'Tu feedback ha sido enviado'
+      })
+      
+      // Actualizar lista de feedback si estamos en esa tab
+      if (activeTab === 'feedback') {
+        fetchFeedbackList()
+      }
+    } catch (error) {
+      console.error('Error sending feedback:', error)
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      })
+    }
   }
 
   const handleAnalyze = async () => {
@@ -275,29 +514,6 @@ export default function DeviceAnalysis() {
     setFeedbackSubmitted(false)
   }
 
-  const handleFeedback = async () => {
-    if (!feedbackComment.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Por favor ingresa un comentario',
-        variant: 'destructive'
-      })
-      return
-    }
-
-    try {
-      // Aquí podrías enviar el feedback a una API
-      console.log('Feedback:', feedbackComment)
-      setFeedbackSubmitted(true)
-      toast({
-        title: 'Gracias',
-        description: 'Tu feedback ha sido enviado'
-      })
-    } catch (error) {
-      console.error('Error sending feedback:', error)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -307,9 +523,11 @@ export default function DeviceAnalysis() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="analyze">Análisis</TabsTrigger>
             <TabsTrigger value="history">Historial</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+            <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analyze" className="space-y-6">
@@ -619,6 +837,153 @@ export default function DeviceAnalysis() {
                   <div className="text-center py-8 text-gray-500">
                     <History className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                     <p>No hay análisis anteriores</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="logs" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Logs del Sistema
+                </CardTitle>
+                <CardDescription>
+                  Visualiza y busca logs de las operaciones del sistema
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Search and Filters */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Buscar en logs..."
+                      value={logsSearchQuery}
+                      onChange={(e) => setLogsSearchQuery(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && searchLogs()}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={logsFilters.level}
+                      onChange={(e) => setLogsFilters({...logsFilters, level: e.target.value})}
+                      className="px-3 py-2 border rounded-md text-sm"
+                    >
+                      <option value="">Todos los niveles</option>
+                      <option value="ERROR">Error</option>
+                      <option value="WARNING">Warning</option>
+                      <option value="INFO">Info</option>
+                      <option value="DEBUG">Debug</option>
+                    </select>
+                    <Button onClick={searchLogs} disabled={logsLoading}>
+                      {logsLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button onClick={fetchRecentLogs} variant="outline" disabled={logsLoading}>
+                      <Clock className="h-4 w-4 mr-2" />
+                      Recientes
+                    </Button>
+                    <Button onClick={clearLogs} variant="destructive" disabled={logsLoading}>
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Limpiar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Logs Display */}
+                <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+                  {logsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                    </div>
+                  ) : logs.length > 0 ? (
+                    <div className="space-y-1">
+                      {logs.map((log, index) => (
+                        <div key={index} className="font-mono text-xs text-gray-300">
+                          <span className="text-gray-500">
+                            {log.timestamp || new Date().toISOString()}
+                          </span>
+                          <span className={`ml-2 ${
+                            log.level === 'ERROR' ? 'text-red-400' :
+                            log.level === 'WARNING' ? 'text-yellow-400' :
+                            log.level === 'INFO' ? 'text-blue-400' :
+                            'text-gray-400'
+                          }`}>
+                            [{log.level || 'INFO'}]
+                          </span>
+                          <span className="ml-2">{log.message || log}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <FileText className="h-12 w-12 mx-auto mb-2 text-gray-600" />
+                      <p>No hay logs para mostrar</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="feedback" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Feedback de Usuarios
+                </CardTitle>
+                <CardDescription>
+                  Lista de todos los feedbacks enviados por los usuarios
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {feedbackLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : feedbackList.length > 0 ? (
+                  <div className="space-y-4">
+                    {feedbackList.map((feedback, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <span className="font-medium">Análisis #{feedback.analysis_id}</span>
+                            <div className="flex items-center gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${
+                                    i < (feedback.rating || 5) 
+                                      ? 'text-yellow-400 fill-current' 
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {new Date(feedback.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">{feedback.comment}</p>
+                        {feedback.user_agent && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            {feedback.user_agent}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>No hay feedbacks registrados</p>
                   </div>
                 )}
               </CardContent>
