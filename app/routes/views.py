@@ -62,21 +62,56 @@ def create_tickets():
 def all_flow_tickets():
     """Ejecuta procesos de tickets en secuencia, esperando a que cada uno termine"""
     try:
-        # Primer hilo: download_csv
-        logger.info("Iniciando download_csv...")
-        hilo1 = threading.Thread(target=thread_download_csv)
+        # Contenedor para capturar el resultado del thread
+        resultado_descarga = {'exito': False}
+
+        def wrapper_download():
+            resultado_descarga['exito'] = thread_download_csv()
+
+        # Primer paso: download_csv
+        logger.info("🔄 Iniciando download_csv...")
+        hilo1 = threading.Thread(target=wrapper_download)
         hilo1.start()
         hilo1.join()  # Espera a que termine antes de continuar
-        logger.info("download_csv completado")
 
-        create_tickets()
-        logger.info("create_tickets completado")
+        # Verificar si la descarga fue exitosa
+        if not resultado_descarga['exito']:
+            logger.error("❌ download_csv falló - ABORTANDO flujo")
+            return jsonify({
+                "success": False,
+                "message": "Error en descarga de CSV. No se crearon tickets.",
+                "error": "La descarga de CSV no fue exitosa"
+            }), 500
+
+        logger.info("✅ download_csv completado exitosamente")
+
+        # Solo continuar si la descarga fue exitosa
+        resultado_creacion = {'exito': False}
+
+        def wrapper_create():
+            app = current_app._get_current_object()
+            resultado_creacion['exito'] = thread_create_tickets(app)
+
+        logger.info("🔄 Iniciando create_tickets...")
+        hilo2 = threading.Thread(target=wrapper_create)
+        hilo2.start()
+        hilo2.join()  # Espera a que termine antes de continuar
+
+        if not resultado_creacion['exito']:
+            logger.error("❌ create_tickets falló")
+            return jsonify({
+                "success": False,
+                "message": "Error al crear tickets en Splynx"
+            }), 500
+
+        logger.info("✅ create_tickets completado exitosamente")
 
         return jsonify({
             "success": True,
-            "message": "Todos los procesos completados en secuencia"
+            "message": "Todos los procesos completados en secuencia exitosamente"
         }), 200
     except Exception as e:
+        logger.error(f"❌ Error en all_flow: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)

@@ -2,11 +2,12 @@
 Job para sincronizar el estado de tickets con Splynx
 Verifica si tickets están cerrados en Splynx y actualiza la BD local
 Calcula exceeded_threshold y response_time_minutes
+OPTIMIZADO: Usa SplynxServicesSingleton para evitar múltiples logins
 """
 
 from app.utils.config import db
 from app.models.models import IncidentsDetection
-from app.services.splynx_services import SplynxServices
+from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.utils.config_helper import ConfigHelper
 from datetime import datetime
 import pytz
@@ -38,7 +39,7 @@ def sync_tickets_status():
     Actualiza: is_closed, closed_at, exceeded_threshold, response_time_minutes
     """
     try:
-        splynx = SplynxServices()
+        splynx = SplynxServicesSingleton()
         
         # Obtener threshold desde configuración (default 60 minutos)
         threshold_minutes = ConfigHelper.get_int('TICKET_ALERT_THRESHOLD_MINUTES', 60)

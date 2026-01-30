@@ -1,10 +1,11 @@
 """
 Ticket Manager - Handles ticket filtering and cleanup operations
 Separates business logic from API calls
+OPTIMIZADO: Usa SplynxServicesSingleton para evitar múltiples logins
 """
 
 
-from app.services.splynx_services import SplynxServices
+from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.services.whatsapp_service import WhatsAppService
 from app.interface.interfaces import TicketResponseMetricsInterface
 from app.utils.schedule_helper import ScheduleHelper
@@ -18,15 +19,15 @@ logger = get_logger(__name__)
 
 class TicketManager:
     """Manages ticket operations including filtering and cleanup"""
-    
+
     ASSIGNABLE_PERSONS = [10, 27, 37, 38]
 
-    def __init__(self, splynx_service: SplynxServices):
+    def __init__(self, splynx_service: SplynxServicesSingleton):
         """
         Initialize the ticket manager
 
         Args:
-            splynx_service: An instance of SplynxServices
+            splynx_service: An instance of SplynxServicesSingleton (Singleton)
         """
         self.splynx = splynx_service
         self.whatsapp = WhatsAppService()

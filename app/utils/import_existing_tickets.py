@@ -1,11 +1,12 @@
 """
 Importa tickets existentes del grupo 4 de Splynx a la BD local
 Se ejecuta periódicamente para asegurar que todos los tickets activos estén en BD
+OPTIMIZADO: Usa SplynxServicesSingleton para evitar múltiples logins
 """
 
 from app.utils.config import db
 from app.models.models import IncidentsDetection
-from app.services.splynx_services import SplynxServices
+from app.services.splynx_services_singleton import SplynxServicesSingleton
 from datetime import datetime
 import logging
 
@@ -27,7 +28,7 @@ def import_existing_tickets_from_splynx():
     Solo importa tickets que no existan ya en la BD.
     """
     try:
-        splynx = SplynxServices()
+        splynx = SplynxServicesSingleton()
         
         # Obtener tickets asignados y no asignados del grupo 4
         logger.info("📥 Importando tickets existentes del grupo 4 desde Splynx...")

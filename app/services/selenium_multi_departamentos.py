@@ -66,188 +66,256 @@ class SeleniumMultiDepartamentos:
         """Realizar login en el sistema"""
         logger.info("*** Abriendo página de login...")
         driver.get(LOGIN_URL)
-        time.sleep(2)
 
-        logger.info("*** Ingresando usuario y contraseña...")
-        driver.find_element(By.NAME, "myusername").send_keys(USUARIO)
-        driver.find_element(By.NAME, "mypassword").send_keys(CONTRASENA)
-
-        logger.info("*** Haciendo clic en 'Ingresar'...")
-        driver.find_element(By.ID, "submit").click()
-
-        # Verificación de login
         try:
-            WebDriverWait(driver, 10).until(
+            # Esperar a que los campos estén disponibles
+            logger.info("*** Esperando campos de login...")
+            username_field = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, "myusername"))
+            )
+            password_field = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, "mypassword"))
+            )
+
+            logger.info("*** Ingresando usuario y contraseña...")
+            username_field.send_keys(USUARIO)
+            password_field.send_keys(CONTRASENA)
+
+            # Esperar explícitamente a que el botón submit esté clickeable
+            # Usar XPath con el texto "Ingresar" para mayor precisión
+            logger.info("*** Esperando botón 'Ingresar'...")
+            submit_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[@type='submit' and contains(text(), 'Ingresar')]"))
+            )
+
+            logger.info("*** Haciendo clic en 'Ingresar'...")
+            # Hacer scroll al elemento para asegurarse de que está visible
+            driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
+            time.sleep(0.5)  # Pequeña pausa después del scroll
+
+            # Intentar clic normal primero
+            try:
+                submit_button.click()
+            except Exception as click_error:
+                # Si falla el clic normal, usar JavaScript click
+                logger.warning(f"*** Clic normal falló, usando JavaScript click: {str(click_error)}")
+                driver.execute_script("arguments[0].click();", submit_button)
+
+            # Verificación de login
+            WebDriverWait(driver, 15).until(
                 EC.url_contains("index.php")
             )
             logger.info("*** Login exitoso")
             return True
-        except TimeoutException:
-            logger.error("*** Login fallido")
+
+        except TimeoutException as e:
+            logger.error(f"*** Login fallido - Timeout: {str(e)}")
+            # Guardar screenshot para debug
+            try:
+                # Guardar en el directorio de logs de la app
+                logs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+                os.makedirs(logs_dir, exist_ok=True)
+                screenshot_path = os.path.join(logs_dir, f"login_error_{int(time.time())}.png")
+                driver.save_screenshot(screenshot_path)
+                logger.error(f"*** Screenshot guardado en: {screenshot_path}")
+            except Exception as screenshot_error:
+                logger.warning(f"*** No se pudo guardar screenshot: {str(screenshot_error)}")
+            return False
+        except Exception as e:
+            logger.error(f"*** Login fallido - Error: {str(e)}")
             return False
 
-    def descargar_csv_departamento(self,dept_key):
-        """Descargar CSV para un departamento específico"""
-
-        driver = self.setup_chrome_driver(dept_key)
-        login = self.login_sistema(driver)
-
-        if not login:
-            logger.error("*** Login fallido. No se puede descargar el CSV")
-            return False
-
-        departamento_info = self.departamentos.get(f"{dept_key}")
-        driver = driver
+    def _get_download_dir(self, dept_key):
+        """Obtiene el directorio de descarga para un departamento"""
         archivos_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "archivos")
-        specific_download_dir = os.path.join(archivos_root, dept_key)
-        os.makedirs(specific_download_dir, exist_ok=True)
+        download_dir = os.path.join(archivos_root, dept_key)
+        os.makedirs(download_dir, exist_ok=True)
+        return download_dir
 
-        download_dir = specific_download_dir
+    def descargar_csv_departamento(self, dept_key):
+        """Descargar CSV para un departamento específico"""
+        driver = None
 
-        if not departamento_info:
-            logger.error(f"*** Departamento no encontrado: {dept_key}")
-            return False
-
-        logger.info(f"*** Procesando departamento: {departamento_info['nombre_display']}")
-
-        # Ir a módulo Casos
-        logger.info("*** Abriendo módulo 'Reclamos / Casos'...")
-        driver.get(CASOS_URL)
-        time.sleep(3)
-
-        # Seleccionar Grupo específico
         try:
-            logger.info(f"*** Seleccionando grupo '{departamento_info['nombre_display']}'...")
-            dropdown_grupo = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "bus_caso_grupo_chosen"))
-            )
-            dropdown_grupo.click()
+            driver = self.setup_chrome_driver(dept_key)
+            login = self.login_sistema(driver)
 
-            opcion_grupo = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, departamento_info['xpath_grupo']))
-            )
-            opcion_grupo.click()
-            logger.info(f"*** Grupo '{departamento_info['nombre_display']}' seleccionado")
-        except TimeoutException:
-            logger.warning(f"*** No se encontró el grupo '{departamento_info['nombre_display']}'. Continuando...")
+            if not login:
+                logger.error("*** Login fallido. No se puede descargar el CSV")
+                return False
 
-        # Seleccionar Estado: Asignado
-        try:
-            logger.info("*** Seleccionando estado 'Asignado'...")
-            dropdown_estado = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "bus_caso_estado_chosen"))
-            )
-            dropdown_estado.click()
+            departamento_info = self.departamentos.get(f"{dept_key}")
+            if not departamento_info:
+                logger.error(f"*** Departamento no encontrado: {dept_key}")
+                return False
 
-            opcion_estado = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//li[contains(text(),'Asignado')]"))
-            )
-            opcion_estado.click()
-            logger.info("*** Estado 'Asignado' seleccionado")
-        except TimeoutException:
-            logger.warning("*** No se encontró el estado 'Asignado'. Continuando...")
+            download_dir = self._get_download_dir(dept_key)
 
-        time.sleep(1)
+            logger.info(f"*** Procesando departamento: {departamento_info['nombre_display']}")
 
-        # Hacer clic en Buscar
-        logger.info("*** Haciendo clic en 'Buscar'...")
-        try:
-            buscar_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//input[@title='Buscar']"))
-            )
-            buscar_btn.click()
+            # Ir a módulo Casos
+            logger.info("*** Abriendo módulo 'Reclamos / Casos'...")
+            driver.get(CASOS_URL)
             time.sleep(3)
-        except TimeoutException:
-            logger.warning("*** No se encontró el botón 'Buscar'. Continuando...")
 
-        # Cambiar filas por página a 100
-        try:
-            logger.info("*** Ajustando filas por página a 100...")
-            select_lpp = Select(WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.ID, "lpp"))
-            ))
-            select_lpp.select_by_value("100")
-            time.sleep(2)
-            logger.info("*** Filas por página ajustadas a 100")
-        except TimeoutException:
-            logger.warning("*** No se encontró el dropdown de filas por página")
+            # Seleccionar Grupo específico
+            try:
+                logger.info(f"*** Seleccionando grupo '{departamento_info['nombre_display']}'...")
+                dropdown_grupo = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, "bus_caso_grupo_chosen"))
+                )
+                dropdown_grupo.click()
 
-        # Descargar CSV
-        logger.info("*** Descargando CSV...")
-        main_window = driver.current_window_handle
-        try:
-            # Obtener lista de archivos antes de la descarga
-            files_before = set(os.listdir(download_dir)) if os.path.exists(download_dir) else set()
+                opcion_grupo = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, departamento_info['xpath_grupo']))
+                )
+                opcion_grupo.click()
+                logger.info(f"*** Grupo '{departamento_info['nombre_display']}' seleccionado")
+            except TimeoutException:
+                logger.warning(f"*** No se encontró el grupo '{departamento_info['nombre_display']}'. Continuando...")
 
-            csv_btn = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//img[contains(@src,'fil_csv.png')]"))
-            )
-            csv_btn.click()
-            time.sleep(2)
+            # Seleccionar Estado: Asignado
+            try:
+                logger.info("*** Seleccionando estado 'Asignado'...")
+                dropdown_estado = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, "bus_caso_estado_chosen"))
+                )
+                dropdown_estado.click()
 
-            # Cambiar a nueva pestaña si se abre
-            all_windows = driver.window_handles
-            for handle in all_windows:
-                if handle != main_window:
-                    driver.switch_to.window(handle)
-                    break
+                opcion_estado = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//li[contains(text(),'Asignado')]"))
+                )
+                opcion_estado.click()
+                logger.info("*** Estado 'Asignado' seleccionado")
+            except TimeoutException:
+                logger.warning("*** No se encontró el estado 'Asignado'. Continuando...")
 
-            # Esperar que termine la descarga
-            timeout = 60
-            start_time = time.time()
-            new_file = None
+            time.sleep(1)
 
-            while time.time() - start_time < timeout:
-                # Verificar archivos.crdownload (descarga en progreso)
-                crdownload_files = glob.glob(os.path.join(download_dir, "*.crdownload"))
-                if crdownload_files:
+            # Hacer clic en Buscar
+            logger.info("*** Haciendo clic en 'Buscar'...")
+            try:
+                buscar_btn = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//input[@title='Buscar']"))
+                )
+                buscar_btn.click()
+                time.sleep(3)
+            except TimeoutException:
+                logger.warning("*** No se encontró el botón 'Buscar'. Continuando...")
+
+            # Cambiar filas por página a 100
+            try:
+                logger.info("*** Ajustando filas por página a 100...")
+                select_lpp = Select(WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.ID, "lpp"))
+                ))
+                select_lpp.select_by_value("100")
+                time.sleep(2)
+                logger.info("*** Filas por página ajustadas a 100")
+            except TimeoutException:
+                logger.warning("*** No se encontró el dropdown de filas por página")
+
+            # Descargar CSV
+            logger.info("*** Descargando CSV...")
+            main_window = driver.current_window_handle
+            try:
+                # Obtener lista de archivos antes de la descarga
+                files_before = set(os.listdir(download_dir)) if os.path.exists(download_dir) else set()
+
+                csv_btn = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//img[contains(@src,'fil_csv.png')]"))
+                )
+                csv_btn.click()
+                time.sleep(2)
+
+                # Cambiar a nueva pestaña si se abre
+                all_windows = driver.window_handles
+                for handle in all_windows:
+                    if handle != main_window:
+                        driver.switch_to.window(handle)
+                        break
+
+                # Esperar que termine la descarga
+                timeout = 60
+                start_time = time.time()
+                new_file = None
+
+                while time.time() - start_time < timeout:
+                    # Verificar archivos.crdownload (descarga en progreso)
+                    crdownload_files = glob.glob(os.path.join(download_dir, "*.crdownload"))
+                    if crdownload_files:
+                        time.sleep(1)
+                        continue
+
+                    # Buscar nuevos archivos CSV
+                    current_files = set(os.listdir(download_dir)) if os.path.exists(download_dir) else set()
+                    new_files = current_files - files_before
+                    csv_new_files = [f for f in new_files if f.endswith('.csv')]
+
+                    if csv_new_files:
+                        new_file = csv_new_files[0]  # Tomar el primer archivo CSV nuevo
+                        break
+
                     time.sleep(1)
-                    continue
 
-                # Buscar nuevos archivos CSV
-                current_files = set(os.listdir(download_dir)) if os.path.exists(download_dir) else set()
-                new_files = current_files - files_before
-                csv_new_files = [f for f in new_files if f.endswith('.csv')]
+                if new_file:
+                    # Renombrar el archivo descargado
+                    source_path = os.path.join(download_dir, new_file)
+                    target_path = os.path.join(download_dir, "casos_recientes.csv")
 
-                if csv_new_files:
-                    new_file = csv_new_files[0]  # Tomar el primer archivo CSV nuevo
-                    break
+                    # Eliminar archivo existente si existe
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
 
-                time.sleep(1)
+                    # Renombrar
+                    os.rename(source_path, target_path)
+                    logger.info(f"*** CSV descargado para {departamento_info['nombre_display']}: casos_recientes.csv")
 
-            if new_file:
-                # Renombrar el archivo descargado
-                source_path = os.path.join(download_dir, new_file)
-                target_path = os.path.join(download_dir, "casos_recientes.csv")
+                    # Guardar en BD (requiere app context, se crea aquí)
+                    from app import create_app
+                    app = create_app()
+                    with app.app_context():
+                        resultado_bd = self.guardar_en_base_datos(dept_key)
+                        logger.info(f"*** Guardado en BD: {resultado_bd['guardados_exitosamente']} tickets de {resultado_bd['total_procesados']} procesados")
 
-                # Eliminar archivo existente si existe
-                if os.path.exists(target_path):
-                    os.remove(target_path)
-
-                # Renombrar
-                os.rename(source_path, target_path)
-                logger.info(f"*** CSV descargado para {departamento_info['nombre_display']}: casos_recientes.csv")
-
-                self.guardar_en_base_datos(dept_key)
-                return True
-            else:
-                # Verificar si ya existe el archivo con el nombre correcto
-                target_path = os.path.join(download_dir, "casos_recientes.csv")
-                if os.path.exists(target_path):
-                    logger.info(f"*** CSV ya existe para {departamento_info['nombre_display']}: casos_recientes.csv")
-                    return True
+                    # Solo considerar exitoso si realmente se guardaron tickets
+                    return resultado_bd['guardados_exitosamente'] > 0
                 else:
-                    logger.warning(f"*** No se descargó CSV para {departamento_info['nombre_display']} - Timeout")
-                    return False
+                    # Verificar si ya existe el archivo con el nombre correcto
+                    target_path = os.path.join(download_dir, "casos_recientes.csv")
+                    if os.path.exists(target_path):
+                        logger.info(f"*** CSV ya existe para {departamento_info['nombre_display']}: casos_recientes.csv")
 
-        except TimeoutException:
-            logger.error(f"*** Error descargando CSV para {departamento_info['nombre_display']}")
-            return False
+                        # Intentar guardar en BD de todas formas
+                        from app import create_app
+                        app = create_app()
+                        with app.app_context():
+                            resultado_bd = self.guardar_en_base_datos(dept_key)
+                            logger.info(f"*** Guardado en BD: {resultado_bd['guardados_exitosamente']} tickets de {resultado_bd['total_procesados']} procesados")
+
+                        # Retornar true si se procesó el archivo (aunque no haya nuevos tickets por duplicados)
+                        return resultado_bd['total_procesados'] > 0
+                    else:
+                        logger.warning(f"*** No se descargó CSV para {departamento_info['nombre_display']} - Timeout")
+                        return False
+
+            except TimeoutException:
+                logger.error(f"*** Error descargando CSV para {departamento_info['nombre_display']}")
+                return False
+
+        finally:
+            # Cerrar driver para liberar recursos
+            if driver:
+                try:
+                    driver.quit()
+                    logger.info("*** Driver cerrado correctamente")
+                except Exception as e:
+                    logger.warning(f"*** Error cerrando driver: {str(e)}")
 
     def guardar_en_base_datos(self, dept_key):
         """
-        Guarda los datos del CSV del departamento directamente en la base de datos
-        sin crear archivos de texto intermedios.
+        Guarda los datos del CSV del departamento directamente en la base de datos.
+        NOTA: Debe ser llamado dentro de un Flask app context.
 
         Args:
             dept_key: Clave del departamento (ej: 'Soporte_Tecnico')
@@ -257,11 +325,6 @@ class SeleniumMultiDepartamentos:
         """
         logger.info(f"*** Guardando datos de {dept_key} directamente en la base de datos...")
 
-        # Crear contexto de aplicación Flask
-        from app import create_app
-        app = create_app()
-        app.app_context().push()
-
         # Preparar resultado
         resultado = {
             "total_procesados": 0,
@@ -270,14 +333,13 @@ class SeleniumMultiDepartamentos:
             "detalles": []
         }
 
-        # Obtener rutas de archivos
-        archivos_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "archivos")
-        specific_dir = os.path.join(archivos_root, dept_key)
-        csv_file = os.path.join(specific_dir, "casos_recientes.csv")
+        # Obtener rutas de archivos usando método helper
+        download_dir = self._get_download_dir(dept_key)
+        csv_file = os.path.join(download_dir, "casos_recientes.csv")
 
         # Verificación detallada del CSV
         logger.info(f"*** Verificando CSV en: {csv_file}")
-        logger.info(f"*** El directorio existe: {os.path.exists(specific_dir)}")
+        logger.info(f"*** El directorio existe: {os.path.exists(download_dir)}")
         logger.info(f"*** El CSV existe: {os.path.exists(csv_file)}")
 
         # Verificar que existe el CSV
@@ -287,9 +349,9 @@ class SeleniumMultiDepartamentos:
             resultado["detalles"].append({"error": error_msg})
 
             # Verificar contenido del directorio
-            logger.info(f"*** Contenido del directorio {specific_dir}:")
+            logger.info(f"*** Contenido del directorio {download_dir}:")
             try:
-                dir_content = os.listdir(specific_dir)
+                dir_content = os.listdir(download_dir)
                 for item in dir_content:
                     logger.info(f"***   - {item}")
             except Exception as e:
@@ -426,7 +488,8 @@ class SeleniumMultiDepartamentos:
 
     def descargar_y_guardar_soporte_tecnico(self):
         """
-        Descarga los datos de Soporte Técnico y los guarda en la base de datos
+        Descarga los datos de Soporte Técnico y los guarda en la base de datos.
+        OPTIMIZADO: Usa métodos helper y elimina código duplicado.
 
         Returns:
             dict: Resumen de la operación
@@ -434,17 +497,16 @@ class SeleniumMultiDepartamentos:
         dept_key = "Soporte_Tecnico"
 
         # Verificar directorios antes de comenzar
-        archivos_root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "archivos")
-        specific_dir = os.path.join(archivos_root, dept_key)
-        csv_file = os.path.join(specific_dir, "casos_recientes.csv")
+        download_dir = self._get_download_dir(dept_key)
+        csv_file = os.path.join(download_dir, "casos_recientes.csv")
 
         logger.info(f"*** VERIFICACIÓN INICIAL ***")
-        logger.info(f"*** Directorio de archivos: {specific_dir}")
+        logger.info(f"*** Directorio de archivos: {download_dir}")
         logger.info(f"*** Ruta del CSV esperado: {csv_file}")
-        logger.info(f"*** El directorio existe: {os.path.exists(specific_dir)}")
+        logger.info(f"*** El directorio existe: {os.path.exists(download_dir)}")
         logger.info(f"*** El CSV existe antes de descargar: {os.path.exists(csv_file)}")
 
-        # Paso 1: Descargar CSV
+        # Paso 1: Descargar CSV (este método ya llama a guardar_en_base_datos internamente)
         logger.info(f"*** INICIANDO DESCARGA DEL CSV ***")
         descarga_exitosa = self.descargar_csv_departamento(dept_key)
 
@@ -475,13 +537,10 @@ class SeleniumMultiDepartamentos:
                 "db_guardado": False
             }
 
-        # Paso 2: Guardar en la base de datos
-        logger.info(f"*** INICIANDO GUARDADO EN BASE DE DATOS ***")
-        resultado_db = self.guardar_en_base_datos(dept_key)
-
+        # El guardado en BD ya se hizo en descargar_csv_departamento
+        # Solo retornamos el resultado exitoso
         return {
-            "estado": "EXITOSO" if resultado_db["guardados_exitosamente"] > 0 else "ERROR",
-            "mensaje": f"Se guardaron {resultado_db['guardados_exitosamente']} de {resultado_db['total_procesados']} registros",
-            "db_guardado": resultado_db["guardados_exitosamente"] > 0,
-            "detalles": resultado_db
+            "estado": "EXITOSO",
+            "mensaje": "CSV descargado y guardado en BD exitosamente",
+            "db_guardado": True
         }
