@@ -69,31 +69,52 @@ jobs:
             
             # Detener contenedores existentes
             echo "🛑 Deteniendo contenedores..."
-            docker compose down -v 2>/dev/null || true
-            
+            docker compose down -v 2>&1 || true
+
             # Limpiar caché de Docker completamente
             echo "🧹 Limpiando caché de Docker..."
-            docker system prune -af
-            
+            docker system prune -af 2>&1
+
             # Construir y levantar con los nuevos cambios
             echo "🏗️  Construyendo nueva imagen..."
-            docker compose build --no-cache --pull
-            
+            docker compose build --no-cache --pull 2>&1
+
+            BUILD_EXIT_CODE=$?
+            if [ $BUILD_EXIT_CODE -ne 0 ]; then
+              echo "❌ Error en el build, código de salida: $BUILD_EXIT_CODE"
+              exit 1
+            fi
+
             echo "🚀 Iniciando contenedores..."
-            docker compose up -d
-            
+            docker compose up -d 2>&1
+
+            UP_EXIT_CODE=$?
+            if [ $UP_EXIT_CODE -ne 0 ]; then
+              echo "❌ Error al iniciar contenedores, código de salida: $UP_EXIT_CODE"
+              docker compose logs --tail=100 backend
+              exit 1
+            fi
+
             # Esperar a que el contenedor esté listo
             echo "⏳ Esperando que el servicio esté listo..."
-            sleep 15
-            
+            sleep 20
+
             # Mostrar estado
             echo "📊 Estado de contenedores:"
-            docker compose ps
-            
+            docker compose ps -a
+
             # Mostrar logs recientes
-            echo "📋 Últimos logs:"
-            docker compose logs --tail=30
-            
+            echo "📋 Últimos logs del backend:"
+            docker compose logs --tail=50 backend
+
+            # Verificar si el contenedor está corriendo
+            if ! docker compose ps | grep -q "Up"; then
+              echo "❌ Contenedor no está corriendo después del inicio"
+              echo "📋 Logs completos:"
+              docker compose logs backend
+              exit 1
+            fi
+
             echo "✅ Despliegue completado exitosamente"
 
       - name: Verify deployment
