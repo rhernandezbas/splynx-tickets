@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: splynx-backend
-    expose:
-      - "7842"
+    ports:
+      - "7842:7842"
     environment:
       - FLASK_APP=app
       - FLASK_ENV=production
@@ -27,31 +27,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: splynx-frontend
-    ports:
-      - "7842:80"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 networks:
   app-network:

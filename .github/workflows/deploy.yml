@@ -113,14 +113,10 @@ jobs:
               echo "📊 Estado de servicios:"
               docker compose ps
               echo ""
-              echo "🌐 Frontend disponible en: http://190.7.234.37:7842"
-              echo "🔌 Backend (interno): http://backend:7842"
-              echo ""
-              echo "📋 Logs del frontend:"
-              docker compose logs --tail=10 frontend
+              echo "🌐 API Backend disponible en: http://190.7.234.37:7842"
               echo ""
               echo "📋 Logs del backend:"
-              docker compose logs --tail=10 backend
+              docker compose logs --tail=20 backend
               exit 0
             else
               echo "❌ Error: Contenedores no están corriendo"
