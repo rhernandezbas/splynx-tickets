@@ -71,6 +71,10 @@ jobs:
             echo "🛑 Deteniendo contenedores..."
             docker compose down -v 2>&1 || true
 
+            # Forzar eliminación de contenedor si existe
+            echo "🗑️  Eliminando contenedor splynx-backend si existe..."
+            docker rm -f splynx-backend 2>&1 || true
+
             # Limpiar caché de Docker completamente
             echo "🧹 Limpiando caché de Docker..."
             docker system prune -af 2>&1
