@@ -28,7 +28,8 @@ class IncidentsDetection(db.Model):
     
     # Campos de métricas (unificados desde ticket_response_metrics)
     exceeded_threshold = db.Column(db.Boolean, default=False)  # Si supera el threshold (>60 min)
-    response_time_minutes = db.Column(db.Integer)  # Tiempo de respuesta en minutos
+    response_time_minutes = db.Column(db.Integer)  # Tiempo de respuesta en minutos (desde última actualización)
+    resolution_time_minutes = db.Column(db.Integer)  # Tiempo total de resolución (creación hasta cierre)
     first_alert_sent_at = db.Column(db.DateTime)  # Primera alerta enviada
     last_alert_sent_at = db.Column(db.DateTime)  # Última alerta enviada
     

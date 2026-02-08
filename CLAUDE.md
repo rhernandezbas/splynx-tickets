@@ -50,6 +50,7 @@ App Splynx is an automated ticket management system that integrates with Splynx 
 - **messages_routes.py**: Message template management
 - **device_analysis_routes.py**: Network device analysis proxy
 - **logs_routes.py**: Audit log endpoints
+- **whatsapp_routes.py**: WhatsApp messaging endpoints (REST API for WhatsApp service)
 - **thread_functions.py**: Background thread implementations
 
 #### 5. Utilities (`app/utils/`)
@@ -156,6 +157,26 @@ poetry run python -m flask db downgrade
 - `POST /api/admin/operators/{id}/resume` - Resume operator
 - `POST /api/admin/system/pause` - Pause entire system
 - `POST /api/admin/system/resume` - Resume system
+
+### WhatsApp Operations
+- `POST /api/whatsapp/send/text` - Send text message to a phone number (admin only)
+- `POST /api/whatsapp/send/overdue-alert` - Send grouped overdue tickets alert to operator (admin only)
+- `POST /api/whatsapp/send/shift-summary` - Send end-of-shift summary to operator (admin only)
+- `POST /api/whatsapp/send/assignment` - Send ticket assignment notification to operator (admin only)
+- `POST /api/whatsapp/send/custom` - Send custom message to operator (admin only)
+- `POST /api/whatsapp/send/bulk` - Send same message to multiple operators, max 50 (admin only)
+- `GET /api/whatsapp/operators/{person_id}/validate` - Validate operator WhatsApp configuration (authenticated)
+- `GET /api/whatsapp/operators/config` - Get WhatsApp configuration for all operators (authenticated)
+- `GET /api/whatsapp/health` - Health check for WhatsApp service (public)
+
+**Authentication**: All send endpoints require admin role. Read endpoints require authentication. Use existing session-based auth.
+
+**Usage Example**:
+```python
+# From services/routes
+whatsapp_service = WhatsAppService()
+result = whatsapp_service.send_custom_message(person_id=10, message="Hello")
+```
 
 ## Scheduled Jobs
 

@@ -132,21 +132,34 @@ def sync_tickets_status():
                                 ticket.closed_at = datetime.now()
                         else:
                             ticket.closed_at = datetime.now()
-                        
+
+                        # Calcular tiempo total de resolución (creación → cierre)
+                        if ticket.closed_at and ticket.Fecha_Creacion:
+                            created_at = parse_gestion_real_date(ticket.Fecha_Creacion)
+                            if created_at:
+                                # Asegurar que closed_at tenga timezone Argentina
+                                closed_at_tz = ensure_argentina_tz(ticket.closed_at)
+                                created_at_tz = ensure_argentina_tz(created_at)
+
+                                # Calcular diferencia en minutos
+                                resolution_time = int((closed_at_tz - created_at_tz).total_seconds() / 60)
+                                ticket.resolution_time_minutes = resolution_time
+                                logger.debug(f"📊 Ticket {ticket_id}: Tiempo de resolución calculado: {resolution_time} minutos")
+
                         # Marcar como cerrado
                         ticket.is_closed = True
                         # IMPORTANTE: NO resetear exceeded_threshold al cerrar
                         # Mantener el valor para cálculo de SLA y observabilidad
                         # Si estuvo vencido, debe permanecer vencido para las métricas
-                        
+
                         # Actualizar estado basado en status_id
                         if status_id == '3':
                             ticket.Estado = 'SUCCESS'
                         else:
                             ticket.Estado = 'CLOSED'
-                        
+
                         closed_count += 1
-                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, is_closed=True, exceeded_threshold={ticket.exceeded_threshold}, status_id={status_id})")
+                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, is_closed=True, exceeded_threshold={ticket.exceeded_threshold}, resolution_time={ticket.resolution_time_minutes}min, status_id={status_id})")
                     else:
                         # Ticket aún abierto
                         ticket.is_closed = False

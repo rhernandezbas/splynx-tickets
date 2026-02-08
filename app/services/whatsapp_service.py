@@ -29,29 +29,29 @@ class WhatsAppService:
     def get_operator_phone(self, person_id: int) -> Optional[str]:
         """
         Obtiene el número de WhatsApp de un operador desde la BD
-        
+
         Args:
             person_id: ID del operador
-            
+
         Returns:
             str: Número de WhatsApp o None si no existe
         """
-        from app.models.models import OperatorConfig
-        operator = OperatorConfig.query.filter_by(person_id=person_id).first()
+        from app.interface.interfaces import OperatorConfigInterface
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
         return operator.whatsapp_number if operator else None
     
     def get_operator_name(self, person_id: int) -> str:
         """
         Obtiene el nombre de un operador desde la BD
-        
+
         Args:
             person_id: ID del operador
-            
+
         Returns:
             str: Nombre del operador
         """
-        from app.models.models import OperatorConfig
-        operator = OperatorConfig.query.filter_by(person_id=person_id).first()
+        from app.interface.interfaces import OperatorConfigInterface
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
         return operator.name if operator else f"Operador {person_id}"
     
     def send_overdue_tickets_alert(self, person_id: int, tickets_list: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -354,16 +354,16 @@ _Sistema de Tickets Splynx_"""
     def validate_operator_config(self, person_id: int) -> Dict[str, Any]:
         """
         Valida que un operador tenga toda la configuración necesaria desde la BD
-        
+
         Args:
             person_id: ID del operador
-            
+
         Returns:
             dict: Estado de la configuración
         """
-        from app.models.models import OperatorConfig
-        operator = OperatorConfig.query.filter_by(person_id=person_id).first()
-        
+        from app.interface.interfaces import OperatorConfigInterface
+        operator = OperatorConfigInterface.get_by_person_id(person_id)
+
         if operator:
             return {
                 "person_id": person_id,
@@ -386,10 +386,10 @@ _Sistema de Tickets Splynx_"""
     def get_all_operators_config(self) -> List[Dict[str, Any]]:
         """
         Obtiene la configuración de todos los operadores desde la BD
-        
+
         Returns:
             list: Lista con configuración de cada operador
         """
-        from app.models.models import OperatorConfig
-        all_operators = OperatorConfig.query.all()
+        from app.interface.interfaces import OperatorConfigInterface
+        all_operators = OperatorConfigInterface.get_all()
         return [self.validate_operator_config(op.person_id) for op in all_operators]

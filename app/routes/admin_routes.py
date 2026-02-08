@@ -848,6 +848,10 @@ def get_operator_metrics(person_id):
         
         response_times = [m.response_time_minutes for m in metrics if m.response_time_minutes]
         avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+
+        # Calcular tiempo promedio de resolución (solo tickets cerrados)
+        resolution_times = [m.resolution_time_minutes for m in metrics if m.is_closed and m.resolution_time_minutes]
+        avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
         
         daily_stats = {}
         for metric in metrics:
@@ -877,7 +881,8 @@ def get_operator_metrics(person_id):
                     'resolved': resolved_tickets,
                     'unresolved': unresolved_tickets,
                     'exceeded_threshold': exceeded_threshold,
-                    'avg_response_time_minutes': round(avg_response_time, 2)
+                    'avg_response_time_minutes': round(avg_response_time, 2),
+                    'avg_resolution_time_minutes': round(avg_resolution_time, 2)
                 },
                 'daily_stats': daily_stats
             }
@@ -911,6 +916,12 @@ def get_metrics():
         # Calcular tiempo promedio de respuesta desde incidents_detection
         avg_response = db.session.query(func.avg(IncidentsDetection.response_time_minutes)).filter(
             IncidentsDetection.response_time_minutes.isnot(None)
+        ).scalar()
+
+        # Calcular tiempo promedio de resolución (solo tickets cerrados)
+        avg_resolution = db.session.query(func.avg(IncidentsDetection.resolution_time_minutes)).filter(
+            IncidentsDetection.is_closed == True,
+            IncidentsDetection.resolution_time_minutes.isnot(None)
         ).scalar()
         
         # Tickets vencidos (exceeded_threshold=True Y is_closed=False)
@@ -969,6 +980,7 @@ def get_metrics():
                 'closed_tickets': closed_tickets,
                 'overdue_tickets': overdue_tickets,
                 'average_response_time': round(avg_response, 2) if avg_response else 0,
+                'average_resolution_time': round(avg_resolution, 2) if avg_resolution else 0,
                 'operator_distribution': operator_distribution
             }
         }), 200

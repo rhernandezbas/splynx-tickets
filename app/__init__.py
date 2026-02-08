@@ -23,12 +23,14 @@ def create_app() -> Flask:
     from app.routes.auth_routes import auth_bp
     from app.routes.logs_routes import logs_bp
     from app.routes.device_analysis_routes import device_analysis_bp
+    from app.routes.whatsapp_routes import whatsapp_bp
     app.register_blueprint(routes_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(logs_bp)
     app.register_blueprint(device_analysis_bp)
+    app.register_blueprint(whatsapp_bp)
     logger.info("✅ Blueprints registrados correctamente")
     
     # Inicializar scheduler inmediatamente al crear la app
