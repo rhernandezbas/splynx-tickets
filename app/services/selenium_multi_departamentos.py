@@ -430,23 +430,11 @@ class SeleniumMultiDepartamentos:
 
                         # Solo procesar si hay cliente
                         if cliente:
-                            # Parsear fecha de Ultimo Contacto de GR (formato: DD-MM-YYYY HH:MM:SS)
-                            ultimo_contacto_dt = None
-                            if ultimo_contacto:
-                                try:
-                                    from datetime import datetime
-                                    # Parsear fecha en formato DD-MM-YYYY HH:MM:SS
-                                    parts = ultimo_contacto.split(' ')
-                                    date_parts = parts[0].split('-')
-                                    time_part = parts[1] if len(parts) > 1 else '00:00:00'
-                                    year = date_parts[2]
-                                    month = date_parts[1]
-                                    day = date_parts[0]
-                                    ultimo_contacto_dt = datetime.strptime(f'{year}-{month}-{day} {time_part}', '%Y-%m-%d %H:%M:%S')
-                                    logger.debug(f"***   Ultimo Contacto parseado: {ultimo_contacto_dt}")
-                                except Exception as e:
-                                    logger.warning(f"*** Error parseando Ultimo Contacto '{ultimo_contacto}': {e}")
-                                    ultimo_contacto_dt = None
+                            # Parsear fecha de Ultimo Contacto de GR usando utilidad compartida
+                            from app.utils.date_utils import parse_gestion_real_date
+                            ultimo_contacto_dt = parse_gestion_real_date(ultimo_contacto)
+                            if ultimo_contacto_dt:
+                                logger.debug(f"***   Ultimo Contacto parseado: {ultimo_contacto_dt}")
 
                             # Crear objeto para la base de datos
                             incident_data = {

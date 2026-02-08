@@ -1052,7 +1052,11 @@ def get_incidents():
                 'created_at': incident.Fecha_Creacion,
                 'closed_at': incident.closed_at.isoformat() if incident.closed_at else None,
                 'is_closed': incident.is_closed,
-                'last_update': incident.last_update.isoformat() if incident.last_update else None,
+                'last_update': (
+                    incident.last_update.isoformat()
+                    if incident.last_update and isinstance(incident.last_update, datetime)
+                    else None
+                ),
                 'response_time_minutes': incident.response_time_minutes,
                 'exceeded_threshold': incident.exceeded_threshold or False,
                 'audit_requested': incident.audit_requested or False,
@@ -1061,8 +1065,12 @@ def get_incidents():
                 'audit_requested_at': incident.audit_requested_at.isoformat() if incident.audit_requested_at else None,
                 'audit_requested_by': incident.audit_requested_by,
                 'recreado': incident.recreado or 0,
-                'is_from_gestion_real': incident.is_from_gestion_real or False,
-                'ultimo_contacto_gr': incident.ultimo_contacto_gr.isoformat() if incident.ultimo_contacto_gr else None
+                'is_from_gestion_real': bool(incident.is_from_gestion_real),
+                'ultimo_contacto_gr': (
+                    incident.ultimo_contacto_gr.isoformat()
+                    if incident.ultimo_contacto_gr and isinstance(incident.ultimo_contacto_gr, datetime)
+                    else None
+                )
             }
             
             incidents_data.append(incident_dict)

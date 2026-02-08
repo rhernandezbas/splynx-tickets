@@ -9,6 +9,7 @@ from app.utils.config import db
 from app.models.models import IncidentsDetection
 from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.utils.config_helper import ConfigHelper
+from app.utils.date_utils import parse_gestion_real_date, parse_splynx_date, ensure_argentina_tz
 from datetime import datetime
 import pytz
 import logging
@@ -17,21 +18,6 @@ logger = logging.getLogger(__name__)
 
 # Timezone de Argentina
 ARGENTINA_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
-
-def parse_date(date_str):
-    """Parse DD-MM-YYYY HH:MM:SS format to datetime"""
-    if not date_str:
-        return None
-    try:
-        parts = date_str.split(' ')
-        date_parts = parts[0].split('-')
-        time_part = parts[1] if len(parts) > 1 else '00:00:00'
-        year = date_parts[2]
-        month = date_parts[1]
-        day = date_parts[0]
-        return datetime.strptime(f'{year}-{month}-{day} {time_part}', '%Y-%m-%d %H:%M:%S')
-    except:
-        return None
 
 def sync_tickets_status():
     """
@@ -86,35 +72,28 @@ def sync_tickets_status():
 
                     # LÓGICA DIFERENCIADA: Tickets de Gestión Real vs Tickets normales de Splynx
                     if ticket.is_from_gestion_real:
-                        # Para tickets de GR: Usar ultimo_contacto_gr si existe
-                        if ticket.ultimo_contacto_gr:
+                        # Para tickets de GR: Usar ultimo_contacto_gr si existe y es válido
+                        if ticket.ultimo_contacto_gr and isinstance(ticket.ultimo_contacto_gr, datetime):
                             last_update = ticket.ultimo_contacto_gr
-                            # Actualizar last_update con ultimo_contacto_gr
                             ticket.last_update = last_update
                             logger.debug(f"*** Ticket {ticket_id} (GR): Usando ultimo_contacto_gr: {last_update}")
                         # Fallback: Si no hay ultimo_contacto_gr, usar updated_at de Splynx
                         elif updated_at:
-                            try:
-                                last_update = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+                            last_update = parse_splynx_date(updated_at)
+                            if last_update:
                                 ticket.last_update = last_update
                                 logger.debug(f"*** Ticket {ticket_id} (GR): Fallback a Splynx updated_at: {last_update}")
-                            except ValueError:
-                                last_update = None
                     else:
                         # Para tickets normales de Splynx: Usar updated_at
                         if updated_at:
-                            try:
-                                last_update = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
-                                # Guardar last_update en BD
+                            last_update = parse_splynx_date(updated_at)
+                            if last_update:
                                 ticket.last_update = last_update
                                 logger.debug(f"*** Ticket {ticket_id} (Splynx): Usando updated_at: {last_update}")
-                            except ValueError:
-                                last_update = None
 
                     # Si no hay last_update aún, usar fecha de creación como fallback
                     if not last_update:
-                        last_update = parse_date(ticket.Fecha_Creacion)
-                        # Si usamos Fecha_Creacion, también guardarlo en last_update si no existe
+                        last_update = parse_gestion_real_date(ticket.Fecha_Creacion)
                         if last_update and not ticket.last_update:
                             ticket.last_update = last_update
                             logger.debug(f"*** Ticket {ticket_id}: Fallback a Fecha_Creacion: {last_update}")
@@ -122,11 +101,11 @@ def sync_tickets_status():
                     if last_update:
                         # Usar hora de Argentina para el cálculo
                         now_argentina = datetime.now(ARGENTINA_TZ)
-                        
-                        # Si last_update no tiene timezone, asumimos que es Argentina
-                        if last_update.tzinfo is None:
-                            last_update = ARGENTINA_TZ.localize(last_update)
-                        
+
+                        # Asegurar que last_update tenga timezone Argentina
+                        last_update = ensure_argentina_tz(last_update)
+
+                        # Calcular tiempo transcurrido en minutos
                         time_since_update = int((now_argentina - last_update).total_seconds() / 60)
                         ticket.response_time_minutes = time_since_update
                         
