@@ -291,7 +291,12 @@ Long-running operations use background threads:
 - Session-based authentication with role-based access control (RBAC)
 - Roles: `admin` (full access) and `operator` (limited access)
 - Operators linked to `person_id` for ticket assignment
-- Page-level permissions: `can_access_operator_view`, `can_access_device_analysis`
+- Page-level permissions stored in `users` table:
+  - `can_access_operator_view` (default: true) - Vista de operador
+  - `can_access_device_analysis` (default: true) - Análisis de dispositivos
+  - `can_access_noc_dashboard` (default: false) - Ver NOC Dashboard (sites, eventos, métricas)
+  - `can_access_noc_control` (default: false) - Control del NOC (polling, WhatsApp, post-mortems)
+- If `role === 'admin'`: Frontend ignores individual permissions and grants full access
 - Session security configured via `SESSION_COOKIE_SECURE` (enable in production with HTTPS)
 
 ## Selenium Configuration

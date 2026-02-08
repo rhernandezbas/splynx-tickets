@@ -65,9 +65,9 @@ def login():
             'performed_by': user.username,
             'ip_address': request.remote_addr
         })
-        
+
         return jsonify({
-            'message': 'Login exitoso',
+            'success': True,
             'user': user.to_dict()
         }), 200
         
@@ -329,34 +329,44 @@ def update_user_permissions(user_id):
     """Actualizar permisos de acceso a páginas de un usuario"""
     try:
         from app.models.models import User
-        
+
         data = request.get_json()
-        
+
         user = User.query.get(user_id)
         if not user:
             return jsonify({'error': 'Usuario no encontrado'}), 404
-        
+
         # Guardar valores antiguos para auditoría
         old_permissions = {
             'can_access_operator_view': user.can_access_operator_view,
-            'can_access_device_analysis': user.can_access_device_analysis
+            'can_access_device_analysis': user.can_access_device_analysis,
+            'can_access_noc_dashboard': user.can_access_noc_dashboard,
+            'can_access_noc_control': user.can_access_noc_control
         }
-        
+
         # Actualizar permisos enviados
         if 'can_access_operator_view' in data:
             user.can_access_operator_view = bool(data['can_access_operator_view'])
-        
+
         if 'can_access_device_analysis' in data:
             user.can_access_device_analysis = bool(data['can_access_device_analysis'])
-        
+
+        if 'can_access_noc_dashboard' in data:
+            user.can_access_noc_dashboard = bool(data['can_access_noc_dashboard'])
+
+        if 'can_access_noc_control' in data:
+            user.can_access_noc_control = bool(data['can_access_noc_control'])
+
         db.session.commit()
-        
+
         # Registrar en auditoría
         new_permissions = {
             'can_access_operator_view': user.can_access_operator_view,
-            'can_access_device_analysis': user.can_access_device_analysis
+            'can_access_device_analysis': user.can_access_device_analysis,
+            'can_access_noc_dashboard': user.can_access_noc_dashboard,
+            'can_access_noc_control': user.can_access_noc_control
         }
-        
+
         AuditLogInterface.create({
             'action': 'update_permissions',
             'entity_type': 'user',
@@ -367,17 +377,15 @@ def update_user_permissions(user_id):
             'ip_address': request.remote_addr,
             'notes': f'Permisos actualizados para {user.username}'
         })
-        
+
         logger.info(f"✅ Permisos actualizados para usuario {user.username}")
-        
+
         return jsonify({
-            'message': 'Permisos actualizados correctamente',
-            'permissions': {
-                'can_access_operator_view': user.can_access_operator_view,
-                'can_access_device_analysis': user.can_access_device_analysis
-            }
+            'success': True,
+            'message': 'Permiso actualizado',
+            'user': user.to_dict()
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Error al actualizar permisos: {e}")
         db.session.rollback()
