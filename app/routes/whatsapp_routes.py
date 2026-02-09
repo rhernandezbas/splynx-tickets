@@ -87,7 +87,6 @@ def build_service_response(result):
 
 
 @whatsapp_bp.route('/send/text', methods=['POST'])
-@admin_required
 @whatsapp_handler(SendTextMessageSchema)
 def send_text_message(validated_data):
     """
