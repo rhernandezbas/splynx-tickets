@@ -61,3 +61,23 @@ dt = datetime.strptime(f'{year}-{month}-{day} {time_part}', '%Y-%m-%d %H:%M:%S')
 - Date parsing logic repeated (in selenium and sync_tickets_status) → could extract to utility
 - Manual date component extraction fragile → consider dateutil.parser for robustness
 - No index on `is_from_gestion_real` field → consider adding if querying frequently
+
+## WhatsApp Routes Review (2026-02-08)
+
+### Code Duplication Identified
+- All 5 routes have identical try-except-ValidationError-Exception pattern (90+ lines duplicated)
+- Error response format repeated 5 times with only minor differences
+- EvolutionAPIService instantiation duplicated in send_text_message route (already in WhatsAppService)
+
+### Layer Violations
+- WhatsAppService bypasses interface layer: direct OperatorConfig.query.filter_by() calls (lines 40, 54, 365, 394)
+- Should use OperatorConfigInterface.get_by_person_id() and .get_all() instead
+
+### Security Issues
+- No authentication on any WhatsApp endpoint (should have @login_required or @admin_required)
+- Health check endpoint exposes EVOLUTION_API_BASE_URL publicly (line 499)
+- No rate limiting on bulk message endpoint (could spam operators)
+
+### Patterns to Extract
+- Error handling decorator pattern could eliminate 90% of route code duplication
+- EvolutionAPIService instantiation should be centralized (already in WhatsAppService)
