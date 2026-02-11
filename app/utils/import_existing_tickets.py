@@ -62,19 +62,33 @@ def import_existing_tickets_from_splynx():
                 status_id = ticket.get('status_id', '1')
                 priority_id = ticket.get('priority_id', '2')
                 # IMPORTANTE: La API de Splynx usa 'assign_to' no 'assigned_to'
-                assigned_to = ticket.get('assign_to', None) or ticket.get('assigned_to', None)
+                assigned_to_raw = ticket.get('assign_to', None) or ticket.get('assigned_to', None)
                 created_at = ticket.get('created_at', '')
                 closed = ticket.get('closed', '0')
-                
+
+                # Convertir assigned_to a int de forma segura
+                assigned_to = None
+                if assigned_to_raw:
+                    try:
+                        assigned_to_int = int(assigned_to_raw)
+                        # Solo asignar si es un ID válido (mayor que 0)
+                        if assigned_to_int > 0:
+                            assigned_to = assigned_to_int
+                            logger.info(f"✅ Ticket {ticket_id} viene asignado a person_id: {assigned_to}")
+                        else:
+                            logger.debug(f"⚠️ Ticket {ticket_id} tiene assigned_to=0, guardando como no asignado")
+                    except (ValueError, TypeError):
+                        logger.warning(f"⚠️ Ticket {ticket_id} tiene assigned_to inválido: {assigned_to_raw}")
+
                 # Convertir fecha
                 fecha_creacion = parse_splynx_date(created_at)
                 if not fecha_creacion:
                     fecha_creacion = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                
+
                 # Mapear prioridad
                 priority_map = {'1': 'Baja', '2': 'Media', '3': 'Alta', '4': 'Crítica'}
                 prioridad = priority_map.get(str(priority_id), 'Media')
-                
+
                 # Mapear estado
                 if closed == '1':
                     estado = 'SUCCESS' if status_id == '3' else 'CLOSED'
@@ -82,7 +96,7 @@ def import_existing_tickets_from_splynx():
                 else:
                     estado = 'OPEN'
                     is_closed = False
-                
+
                 # Crear registro en BD
                 incident_data = {
                     'Cliente': customer_id,
@@ -93,7 +107,7 @@ def import_existing_tickets_from_splynx():
                     'Estado': estado,
                     'Prioridad': prioridad,
                     'is_created_splynx': True,  # Ya existe en Splynx
-                    'assigned_to': int(assigned_to) if assigned_to else None,
+                    'assigned_to': assigned_to,  # Ya validado y convertido arriba
                     'is_closed': is_closed
                 }
                 
