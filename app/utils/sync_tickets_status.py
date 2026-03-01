@@ -14,6 +14,7 @@ from app.utils.date_utils import parse_ticket_date, parse_splynx_date, ensure_ar
 from app.utils.logger import get_logger
 from app.interface.reassignment_history import ReassignmentHistoryInterface
 from app.interface.interfaces import OperatorConfigInterface
+from app.interface.webhook_interface import HookCierreTicketInterface
 from datetime import datetime
 import pytz
 
@@ -29,6 +30,40 @@ def _get_operator_name(person_id):
         return 'Sin asignar'
     op = OperatorConfigInterface.get_by_person_id(person_id)
     return op.name if op else f'Operador {person_id}'
+
+
+def _close_ticket_normally(ticket, ticket_id, updated_at, status_id):
+    """Helper to close a ticket normally (used by sync and reopen checker)."""
+    # Usar updated_at de Splynx como fecha de cierre
+    if updated_at:
+        try:
+            ticket.closed_at = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            ticket.closed_at = datetime.now()
+    else:
+        ticket.closed_at = datetime.now()
+
+    # Calcular tiempo total de resolución (creación → cierre)
+    if ticket.closed_at and ticket.Fecha_Creacion:
+        created_at = parse_ticket_date(ticket.Fecha_Creacion)
+        if created_at:
+            closed_at_tz = ensure_argentina_tz(ticket.closed_at)
+            created_at_tz = ensure_argentina_tz(created_at)
+            resolution_time = int((closed_at_tz - created_at_tz).total_seconds() / 60)
+            ticket.resolution_time_minutes = resolution_time
+            logger.debug(f"📊 Ticket {ticket_id}: Tiempo de resolución calculado: {resolution_time} minutos")
+
+    # Marcar como cerrado
+    ticket.is_closed = True
+    ticket.splynx_closed_at = None  # Limpiar ventana
+
+    # Actualizar estado basado en status_id
+    if status_id == '3':
+        ticket.Estado = 'SUCCESS'
+    else:
+        ticket.Estado = 'CLOSED'
+
+    logger.info(f"✅ Ticket {ticket_id} cerrado (is_closed=True, exceeded_threshold={ticket.exceeded_threshold}, resolution_time={ticket.resolution_time_minutes}min, status_id={status_id})")
 
 
 def sync_tickets_status():
@@ -194,45 +229,32 @@ def sync_tickets_status():
                     
                     # Si el ticket está cerrado en Splynx (closed = "1")
                     if is_closed:
-                        # Usar updated_at de Splynx como fecha de cierre
-                        if updated_at:
-                            try:
-                                ticket.closed_at = datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
-                            except ValueError:
-                                ticket.closed_at = datetime.now()
+                        # Caso 3: Verificar si ya existe cierre de GR antes de iniciar ventana
+                        gr_closure_exists = False
+                        if ticket.numero_ticket_gr:
+                            gr_closure = HookCierreTicketInterface.find_by_numero_ticket(ticket.numero_ticket_gr)
+                            gr_closure_exists = gr_closure is not None
+
+                        if gr_closure_exists:
+                            # Caso 3: GR cerró primero → cerrar directamente sin ventana
+                            _close_ticket_normally(ticket, ticket_id, updated_at, status_id)
+                            closed_count += 1
+                            logger.info(f"✅ Ticket {ticket_id} cerrado directamente (cierre GR ya existía, caso 3)")
+                        elif ticket.splynx_closed_at is None:
+                            # Caso 1/2: Iniciar ventana de espera
+                            ticket.splynx_closed_at = datetime.now(ARGENTINA_TZ).replace(tzinfo=None)
+                            logger.info(f"⏳ Ticket {ticket_id} cerrado en Splynx - iniciando ventana de reapertura (splynx_closed_at={ticket.splynx_closed_at})")
                         else:
-                            ticket.closed_at = datetime.now()
-
-                        # Calcular tiempo total de resolución (creación → cierre)
-                        if ticket.closed_at and ticket.Fecha_Creacion:
-                            created_at = parse_ticket_date(ticket.Fecha_Creacion)
-                            if created_at:
-                                # Asegurar que closed_at tenga timezone Argentina
-                                closed_at_tz = ensure_argentina_tz(ticket.closed_at)
-                                created_at_tz = ensure_argentina_tz(created_at)
-
-                                # Calcular diferencia en minutos
-                                resolution_time = int((closed_at_tz - created_at_tz).total_seconds() / 60)
-                                ticket.resolution_time_minutes = resolution_time
-                                logger.debug(f"📊 Ticket {ticket_id}: Tiempo de resolución calculado: {resolution_time} minutos")
-
-                        # Marcar como cerrado
-                        ticket.is_closed = True
-                        # IMPORTANTE: NO resetear exceeded_threshold al cerrar
-                        # Mantener el valor para cálculo de SLA y observabilidad
-                        # Si estuvo vencido, debe permanecer vencido para las métricas
-
-                        # Actualizar estado basado en status_id
-                        if status_id == '3':
-                            ticket.Estado = 'SUCCESS'
-                        else:
-                            ticket.Estado = 'CLOSED'
-
-                        closed_count += 1
-                        logger.info(f"✅ Ticket {ticket_id} marcado como cerrado (closed=1, is_closed=True, exceeded_threshold={ticket.exceeded_threshold}, resolution_time={ticket.resolution_time_minutes}min, status_id={status_id})")
+                            # Ya tiene splynx_closed_at, el reopen_checker se encarga
+                            logger.debug(f"⏳ Ticket {ticket_id} en ventana de reapertura (splynx_closed_at={ticket.splynx_closed_at})")
                     else:
                         # Ticket aún abierto
                         ticket.is_closed = False
+                        # Si tenía ventana de reapertura pero Splynx ya no lo marca como cerrado,
+                        # limpiar splynx_closed_at (fue reabierto manualmente o por el reopen checker)
+                        if ticket.splynx_closed_at is not None:
+                            logger.info(f"🔄 Ticket {ticket_id} ya no está cerrado en Splynx, limpiando splynx_closed_at")
+                            ticket.splynx_closed_at = None
                         logger.debug(f"ℹ️  Ticket {ticket_id} aún abierto (closed=0, response_time={ticket.response_time_minutes}min, exceeded={ticket.exceeded_threshold})")
                         
             except Exception as e:

@@ -58,6 +58,7 @@ def process_pending_webhooks():
                 'Prioridad': 'medium',
                 'is_created_splynx': False,
                 'last_update': hook.received_at,
+                'numero_ticket_gr': hook.numero_ticket,  # ID del ticket en Gestión Real
             }
 
             result = IncidentsInterface.create(incident_data)

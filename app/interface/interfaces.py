@@ -73,7 +73,8 @@ class IncidentsInterface(BaseInterface):
                 Prioridad=data.get('Prioridad'),
                 is_created_splynx=data.get('is_created_splynx', False),
                 assigned_to=data.get('assigned_to'),
-                last_update=data.get('last_update')
+                last_update=data.get('last_update'),
+                numero_ticket_gr=data.get('numero_ticket_gr')
             )
 
             if BaseInterface.add_item(incident):

@@ -278,6 +278,24 @@ class SplynxServicesSingleton:
             logger.error(f"Error creating ticket: {e}")
             raise
 
+    def reopen_ticket(self, ticket_id: str):
+        """Reopen a closed ticket in Splynx by setting closed=0 and status_id=1"""
+        url = f"{self.base_url}/api/2.0/admin/support/tickets/{ticket_id}"
+        data = {"closed": "0", "status_id": "1"}
+
+        try:
+            response = self._make_request('put', url, data=data)
+
+            if response and response.status_code in [200, 201, 202, 204]:
+                logger.info(f"✅ Ticket {ticket_id} reabierto en Splynx")
+                return {"success": True, "ticket_id": ticket_id}
+
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error reabriendo ticket {ticket_id}: {e}")
+            return None
+
     @classmethod
     def reset_instance(cls):
         """Reset singleton instance (useful for testing)"""

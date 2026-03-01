@@ -111,3 +111,14 @@ class HookCierreTicketInterface:
     def get_all() -> List[HookCierreTicket]:
         """Return all ticket-closure webhook records."""
         return HookCierreTicket.query.order_by(HookCierreTicket.received_at.desc()).all()
+
+    @staticmethod
+    def find_by_numero_ticket(numero_ticket: int) -> Optional[HookCierreTicket]:
+        """Find a closure webhook record by numero_ticket (GR ticket number)."""
+        try:
+            return HookCierreTicket.query.filter_by(
+                numero_ticket=numero_ticket
+            ).first()
+        except SQLAlchemyError as e:
+            logger.error(f"Error finding HookCierreTicket by numero_ticket {numero_ticket}: {e}")
+            return None

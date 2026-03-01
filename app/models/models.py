@@ -31,6 +31,10 @@ class IncidentsDetection(db.Model):
     last_alert_sent_at = db.Column(db.DateTime)  # Última alerta enviada
     pre_alert_sent_at = db.Column(db.DateTime)  # Pre-alerta enviada
     
+    # Campos de reapertura automática
+    numero_ticket_gr = db.Column(db.Integer, nullable=True)  # ID del ticket en Gestión Real
+    splynx_closed_at = db.Column(db.DateTime, nullable=True)  # Momento en que Splynx reportó cierre (inicio ventana)
+
     # Campos de auditoría
     audit_requested = db.Column(db.Boolean, default=False)  # Operador solicitó auditoría
     audit_notified = db.Column(db.Boolean, default=False)  # Admin fue notificado

@@ -458,6 +458,74 @@ _Sistema de Tickets Splynx_"""
 
         return resultado
 
+    def send_ticket_reopened(
+        self,
+        person_id: int,
+        ticket_id: str,
+        subject: str,
+        customer_name: str
+    ) -> Dict[str, Any]:
+        """
+        Envía notificación cuando un ticket fue reabierto automáticamente
+        porque no se cerró en GR.
+
+        Args:
+            person_id: ID del operador
+            ticket_id: ID del ticket en Splynx
+            subject: Asunto del ticket
+            customer_name: Nombre del cliente
+
+        Returns:
+            dict: Resultado del envío
+        """
+        phone_number = self.get_operator_phone(person_id)
+        operator_name = self.get_operator_name(person_id)
+
+        resultado = {
+            "person_id": person_id,
+            "operator_name": operator_name,
+            "phone_number": phone_number,
+            "ticket_id": ticket_id,
+            "success": False,
+            "error": None
+        }
+
+        if not phone_number:
+            resultado["error"] = "Número de WhatsApp no configurado"
+            return resultado
+
+        message = f"""🔄 *TICKET REABIERTO*
+
+Hola *{operator_name}*,
+
+El ticket *#{ticket_id}* fue reabierto automáticamente porque no se cerró en GR.
+
+👤 {customer_name}
+📝 {subject}
+
+⚠️ *Por favor, cierra el ticket en GR o actualiza su estado.*
+
+_Sistema de Tickets Splynx_"""
+
+        try:
+            response = self.evolution_api.send_text_message(
+                phone_number=phone_number,
+                message=message
+            )
+
+            if response:
+                resultado["success"] = True
+                logger.info(f"✅ Notificación de reapertura enviada a {operator_name} - Ticket #{ticket_id}")
+            else:
+                resultado["error"] = "Error en respuesta de Evolution API"
+                logger.error(f"❌ Error enviando notificación de reapertura a {operator_name}")
+
+        except Exception as e:
+            resultado["error"] = str(e)
+            logger.error(f"❌ Excepción enviando notificación de reapertura: {e}")
+
+        return resultado
+
     def send_custom_message(self, person_id: int, message: str) -> Dict[str, Any]:
         """
         Envía un mensaje personalizado a un operador

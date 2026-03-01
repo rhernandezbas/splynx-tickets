@@ -75,6 +75,40 @@ def run_process_webhooks_job(app):
         logger.info("="*60)
 
 
+def run_ticket_reopen_checker_job(app):
+    """Verifica tickets en ventana de reapertura y reabre si no hay cierre de GR."""
+    with app.app_context():
+        from app.utils.config_helper import ConfigHelper
+
+        # Obtener configuración de horarios desde BD
+        FINDE_HORA_INICIO = ConfigHelper.get_int('FINDE_HORA_INICIO', 9)
+        FINDE_HORA_FIN = ConfigHelper.get_int('FINDE_HORA_FIN', 21)
+        SEMANA_HORA_INICIO = ConfigHelper.get_int('SEMANA_HORA_INICIO', 8)
+        SEMANA_HORA_FIN = ConfigHelper.get_int('SEMANA_HORA_FIN', 23)
+
+    tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+    now = datetime.now(tz_argentina)
+    day_of_week = now.weekday()
+    current_hour = now.hour
+
+    if day_of_week >= 5:
+        if not (FINDE_HORA_INICIO <= current_hour < FINDE_HORA_FIN):
+            return
+    else:
+        if not (SEMANA_HORA_INICIO <= current_hour < SEMANA_HORA_FIN):
+            return
+
+    logger.info(f"🔍 REOPEN CHECKER INICIADO - {now.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    try:
+        with app.app_context():
+            from app.services.ticket_reopen_checker import check_and_reopen_tickets
+            result = check_and_reopen_tickets()
+            logger.info(f"🔍 Reopen checker resultado: {result}")
+    except Exception as e:
+        logger.error(f"❌ Error en reopen checker job: {e}")
+
+
 def run_reset_assignment_counters_job(app):
     """Resetea los contadores de asignación al inicio de cada turno configurado.
 
@@ -215,6 +249,15 @@ def init_scheduler(app):
         replace_existing=True
     )
     
+    # Agregar job para verificar reapertura de tickets (cada 2 minutos)
+    scheduler.add_job(
+        func=lambda: run_ticket_reopen_checker_job(app),
+        trigger=IntervalTrigger(minutes=2),
+        id='ticket_reopen_checker_job',
+        name='Verificar reapertura de tickets cada 2 minutos',
+        replace_existing=True
+    )
+
     # Agregar job para resetear contadores de asignación por turno (cada 1 minuto)
     scheduler.add_job(
         func=lambda: run_reset_assignment_counters_job(app),
@@ -238,6 +281,7 @@ def init_scheduler(app):
     logger.info("   - Desasignacion automatica cada 40 minutos")
     logger.info("   - Sincronizacion estado tickets cada 5 minutos")
     logger.info("   - Importacion tickets existentes cada 5 minutos")
+    logger.info("   - Verificacion reapertura tickets cada 2 minutos")
     logger.info("   - Reset contadores asignacion por turno cada 1 minuto")
     logger.info("Zona horaria: America/Argentina/Buenos_Aires")
     logger.info(f"PID: {os.getpid()}")
