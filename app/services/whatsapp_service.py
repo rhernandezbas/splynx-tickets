@@ -348,9 +348,66 @@ _Sistema de Tickets Splynx_"""
         except Exception as e:
             resultado["error"] = str(e)
             logger.error(f"❌ Excepción enviando notificación de reasignación: {e}")
-        
+
         return resultado
-    
+
+    def send_ticket_removed_notification(
+        self,
+        person_id: int,
+        ticket_id: str,
+        subject: str,
+        new_operator_name: str
+    ) -> Dict[str, Any]:
+        """
+        Notifica a un operador que un ticket fue reasignado a otra persona.
+        """
+        phone_number = self.get_operator_phone(person_id)
+        operator_name = self.get_operator_name(person_id)
+
+        resultado = {
+            "person_id": person_id,
+            "operator_name": operator_name,
+            "success": False,
+            "error": None
+        }
+
+        if not phone_number:
+            resultado["error"] = "Número de WhatsApp no configurado"
+            return resultado
+
+        message = f"""🔄 *TICKET REASIGNADO A OTRO OPERADOR*
+
+Hola {operator_name},
+
+El siguiente ticket fue reasignado a {new_operator_name}:
+
+📋 *Ticket #{ticket_id}*
+📝 Asunto: {subject}
+👤 Nuevo operador: {new_operator_name}
+
+Ya no necesitas atender este ticket.
+
+_Sistema de Tickets Splynx_"""
+
+        try:
+            response = self.evolution_api.send_text_message(
+                phone_number=phone_number,
+                message=message
+            )
+
+            if response:
+                resultado["success"] = True
+                logger.info(f"✅ Notificación de remoción enviada a {operator_name} - Ticket #{ticket_id} → {new_operator_name}")
+            else:
+                resultado["error"] = "Error en respuesta de Evolution API"
+                logger.error(f"❌ Error enviando notificación de remoción a {operator_name}")
+
+        except Exception as e:
+            resultado["error"] = str(e)
+            logger.error(f"❌ Excepción enviando notificación de remoción: {e}")
+
+        return resultado
+
     def send_custom_message(self, person_id: int, message: str) -> Dict[str, Any]:
         """
         Envía un mensaje personalizado a un operador

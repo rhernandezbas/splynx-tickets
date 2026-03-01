@@ -121,6 +121,18 @@ def sync_tickets_status():
                                     logger.info(f"📱 Notificación {'de reasignación' if is_reassignment else 'de asignación'} enviada a {new_name} para ticket {ticket_id}")
                                 else:
                                     logger.error(f"❌ Error enviando notificación: {notif_resultado.get('error', 'Unknown')}")
+
+                                # Notificar al operador anterior que le quitaron el ticket
+                                if is_reassignment:
+                                    try:
+                                        whatsapp_service.send_ticket_removed_notification(
+                                            person_id=old_assigned_to,
+                                            ticket_id=ticket_id,
+                                            subject=ticket.Asunto or 'Sin asunto',
+                                            new_operator_name=new_name
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"⚠️ No se pudo notificar al operador anterior ({old_name}): {e}")
                             except Exception as e:
                                 logger.warning(f"⚠️ No se pudo enviar notificación WhatsApp: {e}")
 

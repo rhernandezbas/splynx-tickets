@@ -342,7 +342,24 @@ class TicketManager:
                     assigned_to=assigned_person_id,
                     reason="auto_assignment_on_creation"
                 )
-                
+
+                # Registrar en historial de reasignaciones
+                from app.interface.reassignment_history import ReassignmentHistoryInterface
+                from app.interface.interfaces import OperatorConfigInterface
+                op_config = OperatorConfigInterface.get_by_person_id(assigned_person_id)
+                op_name = op_config.name if op_config else f'Operador {assigned_person_id}'
+                reassignment_type = 'ticket_recreation' if should_recreate else 'ticket_creation'
+                ReassignmentHistoryInterface.create({
+                    'ticket_id': str(ticket_id),
+                    'from_operator_id': None,
+                    'from_operator_name': 'Sin asignar',
+                    'to_operator_id': assigned_person_id,
+                    'to_operator_name': op_name,
+                    'reason': f'Asignación en {"recreación" if should_recreate else "creación"} de ticket',
+                    'reassignment_type': reassignment_type,
+                    'created_by': 'system'
+                })
+
                 # Enviar notificación por WhatsApp (si está habilitado)
                 from app.utils.config_helper import ConfigHelper
                 if ConfigHelper.is_whatsapp_enabled():
@@ -918,14 +935,31 @@ class TicketManager:
                     if response:
                         # Solo incrementar el contador si la asignación fue exitosa
                         AssignmentTrackerInterface.increment_count(assigned_person_id)
-                        
+
                         # Registrar asignación en historial
                         TicketResponseMetricsInterface.add_assignment_to_history(
                             ticket_id=str(ticket_id),
                             assigned_to=assigned_person_id,
                             reason="auto_assignment"
                         )
-                        
+
+                        # Registrar en historial de reasignaciones
+                        from app.interface.reassignment_history import ReassignmentHistoryInterface
+                        from app.interface.interfaces import OperatorConfigInterface
+                        op_config = OperatorConfigInterface.get_by_person_id(assigned_person_id)
+                        op_name = op_config.name if op_config else f'Operador {assigned_person_id}'
+                        ReassignmentHistoryInterface.create({
+                            'ticket_id': str(ticket_id),
+                            'from_operator_id': None,
+                            'from_operator_name': 'Sin asignar',
+                            'to_operator_id': assigned_person_id,
+                            'to_operator_name': op_name,
+                            'reason': 'Asignación automática de ticket sin asignar',
+                            'reassignment_type': 'auto_assignment',
+                            'created_by': 'system',
+                            'notification_sent': False  # Se actualiza abajo
+                        })
+
                         # Enviar notificación por WhatsApp (si está habilitado)
                         from app.utils.config_helper import ConfigHelper
                         notificacion_enviada = False

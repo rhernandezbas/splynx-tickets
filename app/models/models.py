@@ -401,3 +401,32 @@ class HookCierreTicket(db.Model):
 
     def __repr__(self):
         return f'<HookCierreTicket id: {self.id}, numero_ticket: {self.numero_ticket}>'
+
+
+class HookSplynxEvent(db.Model):
+    """Almacena eventos entrantes desde webhooks de Splynx (cambios de asignación, estado, etc.)."""
+    __tablename__ = 'hook_splynx_event'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(50))  # 'ticket_update', 'ticket_assignment', 'ticket_close', etc.
+    ticket_id = db.Column(db.String(50), nullable=True)  # Splynx ticket ID si disponible
+    payload = db.Column(db.Text)  # Raw JSON payload almacenado como string
+    processed = db.Column(db.Boolean, default=False, index=True)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    error_message = db.Column(db.String(500), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'event_type': self.event_type,
+            'ticket_id': self.ticket_id,
+            'payload': self.payload,
+            'processed': self.processed,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'error_message': self.error_message,
+        }
+
+    def __repr__(self):
+        return f'<HookSplynxEvent id: {self.id}, event_type: {self.event_type}, ticket_id: {self.ticket_id}>'
