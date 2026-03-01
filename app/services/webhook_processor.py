@@ -32,7 +32,7 @@ def process_pending_webhooks():
     errors = 0
 
     # Solo procesar tickets del motivo permitido para crear en Splynx (configurable desde BD)
-    motivo_permitido = ConfigHelper.get('WEBHOOK_MOTIVO_PERMITIDO', 'General Soporte')
+    motivo_permitido = ConfigHelper.get_config('WEBHOOK_MOTIVO_PERMITIDO', 'General Soporte')
 
     for hook in unprocessed:
         try:
