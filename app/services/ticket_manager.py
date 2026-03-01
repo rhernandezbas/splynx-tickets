@@ -290,10 +290,8 @@ class TicketManager:
             customer_name = cliente_nombre if cliente_nombre else "Cliente"
             logger.info(f"✅ Nombre del cliente: {customer_name}")
             
-            # Agregar prefijo 'GR' a tickets que vienen de Gestion Real (solo para Splynx)
-            asunto_splynx = asunto_original
-            if asunto_original.startswith("Ticket-"):
-                asunto_splynx = f"GR {asunto_original}"
+            # Agregar prefijo 'GR' para identificar tickets del sistema externo en Splynx
+            asunto_splynx = f"GR {asunto_original}"
             
             # Preparar nota del ticket
             note_base = f"Ticket creado automaticamente por Api Splynx para el cliente {customer_name}, con fecha original de {fecha_creacion}"

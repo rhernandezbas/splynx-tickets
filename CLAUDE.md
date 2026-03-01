@@ -12,7 +12,7 @@ App Splynx is an automated ticket management system that integrates with Splynx 
 - **Backend**: Flask (Python 3.10+) with SQLAlchemy ORM
 - **Database**: MySQL (remote, hosted at 190.7.234.37:3025)
 - **Task Scheduling**: APScheduler for periodic jobs
-- **Web Scraping**: Selenium with Chromium for Gestión Real integration
+- **Ticket Ingestion**: Webhooks from Gestión Real (see ADR-003)
 - **Notifications**: Evolution API for WhatsApp integration
 - **Deployment**: Docker Compose with multi-stage builds
 
@@ -28,6 +28,8 @@ App Splynx is an automated ticket management system that integrates with Splynx 
   - `SystemConfig`: Global configuration stored in database
   - `User`: Authentication with role-based access (admin/operator)
   - `DeviceAnalysis`: Network device analysis with AI feedback
+  - `HookNuevoTicket`: Incoming webhook payloads for new tickets (with `processed` tracking)
+  - `HookCierreTicket`: Incoming webhook payloads for ticket closures (audit only)
 
 #### 2. Interface Layer (`app/interface/`)
 - **interfaces.py**: CRUD operations for all models with error handling
@@ -38,13 +40,13 @@ App Splynx is an automated ticket management system that integrates with Splynx 
 
 #### 3. Services Layer (`app/services/`)
 - **splynx_services.py**: API integration with Splynx (tickets, customers)
-- **selenium_multi_departamentos.py**: Web scraping from Gestión Real using Selenium
+- **webhook_processor.py**: Processes pending webhooks from Gestión Real into tickets
 - **ticket_manager.py**: Business logic for ticket assignment and management
 - **evolution_api.py**: WhatsApp API integration
 - **whatsapp_service.py**: WhatsApp message formatting and delivery
 
 #### 4. Routes Layer (`app/routes/`)
-- **views.py**: Main ticket endpoints (download, create, assign, close)
+- **views.py**: Main ticket endpoints (process_webhooks, create, assign, close)
 - **admin_routes.py**: Admin panel endpoints (operators, schedules, config)
 - **auth_routes.py**: Authentication endpoints
 - **messages_routes.py**: Message template management
@@ -74,7 +76,6 @@ Use the admin panel or `ConfigHelper` methods to read/modify configuration.
 **SECURITY - Environment Variables**: Sensitive credentials are stored in environment variables (`.env` file):
 - Database credentials: `DB_HOST`, `DB_USER`, `DB_PASSWORD`
 - Splynx API: `SPLYNX_USER`, `SPLYNX_PASSWORD`, `SPLYNX_SSL_VERIFY`
-- Gestión Real: `GESTION_REAL_USERNAME`, `GESTION_REAL_PASSWORD`
 - Evolution API: `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE_NAME`
 - Flask: `SECRET_KEY`, `SESSION_COOKIE_SECURE`
 
@@ -138,10 +139,9 @@ poetry run python -m flask db downgrade
 ## Key Endpoints
 
 ### Ticket Operations
-- `POST /api/tickets/download` - Download CSV from Gestión Real
+- `POST /api/tickets/process_webhooks` - Process pending webhooks and create tickets in Splynx
 - `POST /api/tickets/create` - Create tickets in Splynx
 - `POST /api/tickets/close` - Mark closed tickets
-- `POST /api/tickets/all_flow` - Full workflow (download → create → assign)
 - `POST /api/tickets/assign_unassigned` - Assign unassigned tickets
 - `POST /api/tickets/alert_overdue` - Alert operators about tickets > 45 min
 - `POST /api/tickets/end_of_shift_notifications` - End-of-shift reminders
@@ -182,7 +182,7 @@ result = whatsapp_service.send_custom_message(person_id=10, message="Hello")
 
 The scheduler (`app/utils/scheduler.py`) runs these jobs automatically:
 
-- **Every 3 minutes**: Full ticket flow (download, create, assign)
+- **Every 3 minutes**: Process webhooks and create tickets in Splynx
 - **Every 3 minutes**: Alert overdue tickets (>45 min)
 - **Every hour**: End-of-shift notifications
 - **Every 40 minutes**: Auto-unassign after shift
@@ -276,7 +276,6 @@ Long-running operations use background threads:
 ### Credentials Management
 **ALL credentials are now stored in environment variables (`.env` file)**:
 - **Splynx API**: `SPLYNX_USER`, `SPLYNX_PASSWORD`, `SPLYNX_BASE_URL`, `SPLYNX_SSL_VERIFY`
-- **Gestión Real**: `GESTION_REAL_USERNAME`, `GESTION_REAL_PASSWORD`
 - **Evolution API**: `EVOLUTION_API_KEY`, `EVOLUTION_INSTANCE_NAME`, `EVOLUTION_API_BASE_URL`
 - **Database**: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
 - **Flask**: `SECRET_KEY`, `SESSION_COOKIE_SECURE`
@@ -299,13 +298,14 @@ Long-running operations use background threads:
 - If `role === 'admin'`: Frontend ignores individual permissions and grants full access
 - Session security configured via `SESSION_COOKIE_SECURE` (enable in production with HTTPS)
 
-## Selenium Configuration
+## Webhook Configuration
 
-Runs in Docker with Chromium in headless mode:
-- Chrome binary: `/usr/bin/chromium`
-- ChromeDriver: `/usr/bin/chromedriver`
-- Headless mode enabled for Docker compatibility
-- No sandbox mode (`--no-sandbox`, `--disable-dev-shm-usage`)
+Tickets are received via incoming webhooks from Gestión Real:
+- `POST /api/hooks/nuevo-ticket` - Receives new ticket payloads, validates `numero_ticket` and `numero_cliente`
+- `POST /api/hooks/cierre-ticket` - Receives ticket closure payloads (audit only)
+- Webhooks are stored in `hook_nuevo_ticket` / `hook_cierre_ticket` tables
+- A scheduler job (`process_webhooks_job`) processes pending webhooks every 3 minutes
+- No authentication on webhook endpoints currently (to be improved)
 
 ## Frontend (Removed)
 
@@ -365,8 +365,8 @@ Application runs on **port 7842** (both locally and in production).
 - Check operator pause states in `operator_config`
 - Review assignment tracker counts in `assignment_tracker` table
 
-### Selenium Failures
-- Verify Chromium and ChromeDriver are installed in container
-- Check Gestión Real credentials in `constants.py`
-- Ensure headless mode is enabled for Docker
-- Review Selenium logs in backend container logs
+### Webhooks Not Processing
+- Check `hook_nuevo_ticket` table for records with `processed=False`
+- Verify the `process_webhooks_job` is running in the scheduler
+- Check logs for errors in `webhook_processor.py`
+- Verify `POST /api/hooks/nuevo-ticket` is receiving payloads from Gestión Real

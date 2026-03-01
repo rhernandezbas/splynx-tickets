@@ -6,28 +6,6 @@ Todas las configuraciones y constantes deben estar aquí
 import os
 
 # ============================================================================
-# CONFIGURACIÓN DE SELENIUM / GESTION REAL
-# ============================================================================
-
-USUARIO = os.getenv('GESTION_REAL_USERNAME')
-CONTRASENA = os.getenv('GESTION_REAL_PASSWORD')
-LOGIN_URL = os.getenv('GESTION_REAL_LOGIN_URL', 'https://gestionreal.com.ar/login/main_login.php')
-CASOS_URL = os.getenv('GESTION_REAL_CASOS_URL', 'https://gestionreal.com.ar/index.php?menuitem=10')
-
-DEPARTAMENTOS_SELENIUM = {
-    "Soporte_Tecnico": {
-        "nombre_display": "Soporte Tecnico",
-        "xpath_grupo": "//li[contains(text(),'Soporte Tecnico')]"
-    }
-}
-
-DEPARTAMENTOS = {
-    "Soporte_Tecnico": "Soporte Técnico",
-    #"administracion": "administracion",
-    #"Facturacion": "Facturación"
-}
-
-# ============================================================================
 # CONFIGURACIÓN DE EVOLUTION API / WHATSAPP
 # ============================================================================
 

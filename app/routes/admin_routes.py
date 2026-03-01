@@ -1076,13 +1076,7 @@ def get_incidents():
                 'audit_notified': incident.audit_notified or False,
                 'audit_requested_at': incident.audit_requested_at.isoformat() if incident.audit_requested_at else None,
                 'audit_requested_by': incident.audit_requested_by,
-                'recreado': incident.recreado or 0,
-                'is_from_gestion_real': bool(incident.is_from_gestion_real),
-                'ultimo_contacto_gr': (
-                    incident.ultimo_contacto_gr.isoformat()
-                    if incident.ultimo_contacto_gr and isinstance(incident.ultimo_contacto_gr, datetime)
-                    else None
-                )
+                'recreado': incident.recreado or 0
             }
             
             incidents_data.append(incident_dict)

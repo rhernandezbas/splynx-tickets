@@ -47,6 +47,33 @@ class HookNuevoTicketInterface:
         return HookNuevoTicket.query.filter_by(numero_ticket=numero).order_by(HookNuevoTicket.received_at.desc()).all()
 
 
+    @staticmethod
+    def get_unprocessed() -> List[HookNuevoTicket]:
+        """Return all unprocessed new-ticket webhook records, oldest first."""
+        try:
+            return HookNuevoTicket.query.filter_by(processed=False).order_by(HookNuevoTicket.received_at.asc()).all()
+        except SQLAlchemyError as e:
+            logger.error(f"Error getting unprocessed HookNuevoTicket: {e}")
+            return []
+
+    @staticmethod
+    def mark_processed(record_id: int) -> bool:
+        """Mark a webhook record as processed."""
+        try:
+            from datetime import datetime
+            record = HookNuevoTicket.query.get(record_id)
+            if not record:
+                return False
+            record.processed = True
+            record.processed_at = datetime.utcnow()
+            db.session.commit()
+            return True
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            logger.error(f"Error marking HookNuevoTicket {record_id} as processed: {e}")
+            return False
+
+
 class HookCierreTicketInterface:
     """Repository for HookCierreTicket model."""
 

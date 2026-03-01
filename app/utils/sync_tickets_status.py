@@ -70,26 +70,12 @@ def sync_tickets_status():
                     # Si el ticket fue respondido/actualizado, el contador se resetea
                     last_update = None
 
-                    # LÓGICA DIFERENCIADA: Tickets de Gestión Real vs Tickets normales de Splynx
-                    if ticket.is_from_gestion_real:
-                        # Para tickets de GR: Usar ultimo_contacto_gr si existe y es válido
-                        if ticket.ultimo_contacto_gr and isinstance(ticket.ultimo_contacto_gr, datetime):
-                            last_update = ticket.ultimo_contacto_gr
+                    # Usar updated_at de Splynx como fuente de última actualización
+                    if updated_at:
+                        last_update = parse_splynx_date(updated_at)
+                        if last_update:
                             ticket.last_update = last_update
-                            logger.debug(f"*** Ticket {ticket_id} (GR): Usando ultimo_contacto_gr: {last_update}")
-                        # Fallback: Si no hay ultimo_contacto_gr, usar updated_at de Splynx
-                        elif updated_at:
-                            last_update = parse_splynx_date(updated_at)
-                            if last_update:
-                                ticket.last_update = last_update
-                                logger.debug(f"*** Ticket {ticket_id} (GR): Fallback a Splynx updated_at: {last_update}")
-                    else:
-                        # Para tickets normales de Splynx: Usar updated_at
-                        if updated_at:
-                            last_update = parse_splynx_date(updated_at)
-                            if last_update:
-                                ticket.last_update = last_update
-                                logger.debug(f"*** Ticket {ticket_id} (Splynx): Usando updated_at: {last_update}")
+                            logger.debug(f"*** Ticket {ticket_id}: Usando updated_at: {last_update}")
 
                     # Si no hay last_update aún, usar fecha de creación como fallback
                     if not last_update:

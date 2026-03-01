@@ -73,8 +73,6 @@ class IncidentsInterface(BaseInterface):
                 Prioridad=data.get('Prioridad'),
                 is_created_splynx=data.get('is_created_splynx', False),
                 assigned_to=data.get('assigned_to'),
-                is_from_gestion_real=data.get('is_from_gestion_real', False),
-                ultimo_contacto_gr=data.get('ultimo_contacto_gr'),
                 last_update=data.get('last_update')
             )
 
@@ -84,25 +82,6 @@ class IncidentsInterface(BaseInterface):
         except IntegrityError as e:
             # Duplicate key es esperado cuando el ticket ya existe
             logger.info(f"Incident duplicado (ya existe): Fecha_Creacion={data.get('Fecha_Creacion')}")
-
-            # Si es un ticket de GR y tiene ultimo_contacto_gr, actualizar el registro existente
-            if data.get('is_from_gestion_real') and data.get('ultimo_contacto_gr'):
-                try:
-                    from app.utils.config import db
-                    existing_incident = IncidentsDetection.query.filter_by(
-                        Fecha_Creacion=data.get('Fecha_Creacion')
-                    ).first()
-
-                    if existing_incident:
-                        # Actualizar ultimo_contacto_gr y last_update si cambió
-                        existing_incident.ultimo_contacto_gr = data.get('ultimo_contacto_gr')
-                        existing_incident.last_update = data.get('ultimo_contacto_gr')
-                        db.session.commit()
-                        logger.info(f"✅ Actualizado ultimo_contacto_gr para ticket existente: {data.get('Fecha_Creacion')}")
-                except Exception as update_error:
-                    logger.warning(f"⚠️  Error actualizando ultimo_contacto_gr: {update_error}")
-                    db.session.rollback()
-
             return None
         except Exception as e:
             logger.error(f"Error creating incident: {str(e)}")

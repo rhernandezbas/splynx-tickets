@@ -1,0 +1,177 @@
+structure:
+  components:
+    - id: "operators-page"
+      type: container
+      layout:
+        anchor: fill
+        padding: "24px"
+      children:
+        - "page-header"
+        - "operators-table"
+        - "operator-detail-modal"
+
+    - id: "page-header"
+      type: container
+      layout:
+        anchor: top
+        width: "100%"
+        padding: "0 0 16px 0"
+      children:
+        - "page-title"
+        - "add-operator-btn"
+
+    - id: "page-title"
+      type: text
+      content: "Gestión de Operadores"
+      layout:
+        anchor: left
+
+    - id: "add-operator-btn"
+      type: button
+      content: "Agregar Operador"
+      layout:
+        anchor: right
+
+    - id: "operators-table"
+      type: container
+      layout:
+        anchor: fill
+        width: "100%"
+      attributes:
+        columns:
+          - "Nombre"
+          - "Person ID"
+          - "WhatsApp"
+          - "Estado"
+          - "Asignaciones"
+          - "Notificaciones"
+          - "Acciones"
+
+    - id: "operator-detail-modal"
+      type: container
+      layout:
+        anchor: center
+        width: "600px"
+      children:
+        - "modal-operator-info"
+        - "modal-schedules"
+        - "modal-actions"
+
+    - id: "modal-operator-info"
+      type: container
+      layout:
+        anchor: top
+        width: "100%"
+        padding: "16px"
+
+    - id: "modal-schedules"
+      type: container
+      layout:
+        anchor: fill
+        width: "100%"
+        padding: "16px"
+      attributes:
+        schedule_types:
+          - "work"
+          - "assignment"
+          - "alert"
+
+    - id: "modal-actions"
+      type: container
+      layout:
+        anchor: bottom
+        width: "100%"
+        padding: "16px"
+      children:
+        - "pause-btn"
+        - "pause-assignments-btn"
+        - "toggle-notifications-btn"
+
+    - id: "pause-btn"
+      type: button
+      content: "Pausar Operador"
+      layout:
+        anchor: left
+
+    - id: "pause-assignments-btn"
+      type: button
+      content: "Pausar Asignaciones"
+      layout:
+        anchor: center
+
+    - id: "toggle-notifications-btn"
+      type: button
+      content: "Toggle Notificaciones"
+      layout:
+        anchor: right
+
+semantics:
+  operators-page:
+    role: "main_view"
+    label: "Panel de gestión de operadores"
+    description: "Vista principal para administrar operadores, sus horarios y estados"
+  operators-table:
+    role: "data_table"
+    label: "Tabla de operadores"
+    ariaLabel: "Lista de operadores con su configuración actual"
+  pause-btn:
+    role: "destructive_action"
+    label: "Pausar operador"
+    description: "Pausa total: sin asignaciones ni notificaciones"
+  pause-assignments-btn:
+    role: "warning_action"
+    label: "Pausar asignaciones"
+    description: "Solo detiene nuevas asignaciones, mantiene tickets actuales"
+  toggle-notifications-btn:
+    role: "toggle_action"
+    label: "Toggle notificaciones WhatsApp"
+
+state_model:
+  states: ["listing", "viewing_detail", "editing", "confirming_pause"]
+  currentState: "listing"
+  transitions:
+    - from: "listing"
+      to: "viewing_detail"
+      on: "row_click"
+    - from: "viewing_detail"
+      to: "editing"
+      on: "edit_click"
+    - from: "viewing_detail"
+      to: "confirming_pause"
+      on: "pause_click"
+    - from: "confirming_pause"
+      to: "viewing_detail"
+      on: "confirm_or_cancel"
+    - from: "viewing_detail"
+      to: "listing"
+      on: "close_modal"
+
+motion:
+  viewing_detail:
+    operator-detail-modal:
+      opacity: 1
+      animation: "slide-up"
+  confirming_pause:
+    pause-btn:
+      borderEmphasis: true
+      animation: "pulse"
+
+constraints:
+  - id: "c1"
+    target: "operator-detail-modal"
+    type: visibility
+    condition: "state != listing"
+  - id: "c2"
+    target: "add-operator-btn"
+    type: visibility
+    condition: "state == listing"
+
+annotations:
+  - id: "a1"
+    target: "pause-btn"
+    type: rationale
+    content: "La pausa total requiere confirmación porque afecta asignaciones Y notificaciones"
+  - id: "a2"
+    target: "modal-schedules"
+    type: note
+    content: "Muestra 3 tabs: Horario de trabajo, Horario de asignación, Horario de alertas"

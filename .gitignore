@@ -118,3 +118,4 @@ test_connection.py
 docker-build.sh
 entrypoint.sh
 DOCKER.md
+.cliplin

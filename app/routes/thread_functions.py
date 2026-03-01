@@ -6,8 +6,6 @@ Optimizado con patrón Singleton para evitar múltiples logins
 
 from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.services.ticket_manager import TicketManager
-from app.services.selenium_multi_departamentos import SeleniumMultiDepartamentos
-from app.utils.constants import DEPARTAMENTOS
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,48 +25,28 @@ def get_splynx_service():
     return _splynx_service
 
 
-def thread_download_csv():
+def thread_process_webhooks(app):
     """
-    Versión para hilos de download_csv.
-    Descarga CSV de Gestión Real y guarda en BD.
-    Returns True solo si TODAS las descargas fueron exitosas.
+    Procesa webhooks pendientes y luego crea tickets en Splynx.
+    Reemplaza el viejo flujo Selenium -> CSV -> BD.
     """
-    logger.info("="*60)
-    logger.info("🚀 INICIANDO DESCARGA DE CSV")
-    logger.info("="*60)
+    with app.app_context():
+        from app.services.webhook_processor import process_pending_webhooks
 
-    selenium = SeleniumMultiDepartamentos()
-    total_departamentos = len(DEPARTAMENTOS)
-    exitosos = 0
-    fallidos = 0
-
-    for dept_key in DEPARTAMENTOS:
-        logger.info(f"📥 Descargando CSV para departamento: {dept_key}...")
         try:
-            resultado = selenium.descargar_csv_departamento(dept_key)
-            if resultado:
-                exitosos += 1
-                logger.info(f"✅ Descarga Y guardado exitoso para {dept_key}")
-            else:
-                fallidos += 1
-                logger.error(f"❌ Descarga o guardado fallido para {dept_key}")
+            # Step 1: Process pending webhooks into incidents
+            result = process_pending_webhooks()
+            logger.info(f"Webhooks procesados: {result['processed']} nuevos, {result['duplicates']} duplicados, {result['errors']} errores")
+
+            # Step 2: Create tickets in Splynx for new incidents
+            sp = get_splynx_service()
+            tk = TicketManager(sp)
+            tk.create_ticket()
+            logger.info("Tickets creados en Splynx exitosamente")
+            return True
         except Exception as e:
-            fallidos += 1
-            logger.error(f"❌ Excepción descargando CSV para {dept_key}: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
-
-    # Retornar True solo si TODAS las descargas fueron exitosas
-    exito_completo = (fallidos == 0 and exitosos == total_departamentos)
-
-    logger.info("="*60)
-    if exito_completo:
-        logger.info(f"✅ DESCARGA COMPLETADA: {exitosos}/{total_departamentos} departamentos exitosos")
-    else:
-        logger.error(f"❌ DESCARGA CON ERRORES: {exitosos} exitosos, {fallidos} fallidos de {total_departamentos}")
-    logger.info("="*60)
-
-    return exito_completo
+            logger.error(f"Error en thread_process_webhooks: {str(e)}")
+            return False
 
 
 def thread_close_tickets():

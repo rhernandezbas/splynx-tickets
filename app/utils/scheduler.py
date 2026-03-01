@@ -19,58 +19,57 @@ _scheduler_instance = None
 _scheduler_lock_file = '/tmp/splynx_scheduler.lock'
 
 
-def run_all_flow_job(app):
-    """Ejecuta el flujo completo de tickets llamando al endpoint HTTP"""
+def run_process_webhooks_job(app):
+    """Procesa webhooks pendientes y crea tickets en Splynx llamando al endpoint HTTP"""
     with app.app_context():
         from app.utils.config_helper import ConfigHelper
-        
+
         # Obtener configuración de horarios desde BD
         FINDE_HORA_INICIO = ConfigHelper.get_int('FINDE_HORA_INICIO', 9)
         FINDE_HORA_FIN = ConfigHelper.get_int('FINDE_HORA_FIN', 21)
-    
+
     # Obtener hora actual en Argentina
     tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
     now = datetime.now(tz_argentina)
     day_of_week = now.weekday()  # 0=Lunes, 6=Domingo
     current_hour = now.hour
-    
+
     # HORARIO LABORAL: 8 AM - 11 PM (lunes a viernes) / 9 AM - 9 PM (fin de semana)
     if day_of_week >= 5:  # Sábado o Domingo
         if not (FINDE_HORA_INICIO <= current_hour < FINDE_HORA_FIN):
-            logger.info(f"⏸️  FIN DE SEMANA FUERA DE HORARIO ({current_hour}:00) - Saltando ejecución")
+            logger.info(f"FIN DE SEMANA FUERA DE HORARIO ({current_hour}:00) - Saltando ejecución")
             return
     else:  # Lunes a Viernes
         if not (8 <= current_hour < 23):  # 8 AM - 11 PM
-            logger.info(f"⏸️  FUERA DE HORARIO LABORAL ({current_hour}:00) - Saltando ejecución")
+            logger.info(f"FUERA DE HORARIO LABORAL ({current_hour}:00) - Saltando ejecución")
             return
-    
+
     logger.info("="*60)
-    logger.info(f"🕐 CRON JOB INICIADO - {now.strftime('%Y-%m-%d %H:%M:%S')} (Argentina)")
-    logger.info(f"🔧 PID: {os.getpid()}")
+    logger.info(f"CRON JOB process_webhooks INICIADO - {now.strftime('%Y-%m-%d %H:%M:%S')} (Argentina)")
+    logger.info(f"PID: {os.getpid()}")
     logger.info("="*60)
-    
+
     try:
-        # Llamar al endpoint all_flow
-        logger.info("📡 Llamando al endpoint /api/tickets/all_flow...")
-        response = requests.post('http://localhost:7842/api/tickets/all_flow', timeout=300)
+        logger.info("Llamando al endpoint /api/tickets/process_webhooks...")
+        response = requests.post('http://localhost:7842/api/tickets/process_webhooks', timeout=300)
 
         if response.status_code == 200:
             response_data = response.json()
-            logger.info("✅ Endpoint all_flow ejecutado exitosamente")
-            logger.info(f"📄 Respuesta: {response_data}")
+            logger.info("Endpoint process_webhooks ejecutado exitosamente")
+            logger.info(f"Respuesta: {response_data}")
         else:
-            logger.error(f"❌ Endpoint all_flow FALLÓ con código: {response.status_code}")
-            logger.error(f"📄 Respuesta: {response.text}")
-        
+            logger.error(f"Endpoint process_webhooks FALLO con codigo: {response.status_code}")
+            logger.error(f"Respuesta: {response.text}")
+
         logger.info("="*60)
-        logger.info(f"✅ CRON JOB COMPLETADO - {datetime.now(tz_argentina).strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"CRON JOB COMPLETADO - {datetime.now(tz_argentina).strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info("="*60)
-        
+
     except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Error al llamar al endpoint: {str(e)}")
+        logger.error(f"Error al llamar al endpoint: {str(e)}")
         logger.info("="*60)
     except Exception as e:
-        logger.error(f"❌ Error en cron job: {str(e)}")
+        logger.error(f"Error en cron job: {str(e)}")
         logger.info("="*60)
 
 
@@ -115,16 +114,16 @@ def init_scheduler(app):
     
     scheduler = BackgroundScheduler(timezone='America/Argentina/Buenos_Aires')
     
-    # Agregar job que se ejecuta cada 3 minutos
+    # Agregar job que se ejecuta cada 3 minutos - procesa webhooks y crea tickets
     scheduler.add_job(
-        func=lambda: run_all_flow_job(app),
+        func=lambda: run_process_webhooks_job(app),
         trigger=IntervalTrigger(minutes=3),
-        id='all_flow_job',
-        name='Ejecutar all_flow cada 3 minutos',
+        id='process_webhooks_job',
+        name='Procesar webhooks cada 3 minutos',
         replace_existing=True
     )
     
-    # Agregar job para asignar tickets sin asignar (cada 3 minutos) - INDEPENDIENTE de all_flow
+    # Agregar job para asignar tickets sin asignar (cada 3 minutos)
     scheduler.add_job(
         func=lambda: requests.post('http://localhost:7842/api/tickets/assign_unassigned'),
         trigger=IntervalTrigger(minutes=3),
@@ -183,22 +182,22 @@ def init_scheduler(app):
     _scheduler_instance = scheduler
     
     logger.info("="*60)
-    logger.info("⏰ SCHEDULER INICIADO")
-    logger.info("📋 Tareas programadas:")
-    logger.info("   • all_flow cada 3 minutos")
-    logger.info("   • Asignación tickets sin asignar cada 3 minutos (independiente)")
-    logger.info("   • Alertas tickets vencidos cada 3 minutos")
-    logger.info("   • Notificaciones de fin de turno cada hora")
-    logger.info("   • Desasignación automática cada 40 minutos")
-    logger.info("   • Sincronización estado tickets cada 5 minutos")
-    logger.info("   • Importación tickets existentes cada 5 minutos")
-    logger.info("🌎 Zona horaria: America/Argentina/Buenos_Aires")
-    logger.info(f"🔧 PID: {os.getpid()}")
+    logger.info("SCHEDULER INICIADO")
+    logger.info("Tareas programadas:")
+    logger.info("   - process_webhooks cada 3 minutos")
+    logger.info("   - Asignacion tickets sin asignar cada 3 minutos (independiente)")
+    logger.info("   - Alertas tickets vencidos cada 3 minutos")
+    logger.info("   - Notificaciones de fin de turno cada hora")
+    logger.info("   - Desasignacion automatica cada 40 minutos")
+    logger.info("   - Sincronizacion estado tickets cada 5 minutos")
+    logger.info("   - Importacion tickets existentes cada 5 minutos")
+    logger.info("Zona horaria: America/Argentina/Buenos_Aires")
+    logger.info(f"PID: {os.getpid()}")
     logger.info("="*60)
-    
+
     # Ejecutar inmediatamente al iniciar
-    logger.info("🚀 Ejecutando flujo inicial al arrancar la aplicación...")
+    logger.info("Ejecutando flujo inicial al arrancar la aplicacion...")
     import threading
-    threading.Thread(target=lambda: run_all_flow_job(app)).start()
+    threading.Thread(target=lambda: run_process_webhooks_job(app)).start()
     
     return scheduler

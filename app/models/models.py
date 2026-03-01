@@ -23,9 +23,6 @@ class IncidentsDetection(db.Model):
     is_closed = db.Column(db.Boolean, default=False)  # Indica si el ticket está cerrado
     last_update = db.Column(db.DateTime)  # Última actualización (Splynx updated_at o GR Ultimo Contacto)
     recreado = db.Column(db.Integer, default=0)  # Contador de veces que se ha recreado el ticket
-    is_from_gestion_real = db.Column(db.Boolean, default=False)  # Identifica tickets que vienen de GR
-    ultimo_contacto_gr = db.Column(db.DateTime)  # Última fecha de contacto desde Gestión Real (solo para tickets GR)
-    
     # Campos de métricas (unificados desde ticket_response_metrics)
     exceeded_threshold = db.Column(db.Boolean, default=False)  # Si supera el threshold (>60 min)
     response_time_minutes = db.Column(db.Integer)  # Tiempo de respuesta en minutos (desde última actualización)
@@ -332,6 +329,8 @@ class HookNuevoTicket(db.Model):
     numero_whatsapp = db.Column(db.String(50))
     nombre_usuario = db.Column(db.String(200))
     received_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed = db.Column(db.Boolean, default=False, index=True)
+    processed_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
         return {
@@ -346,6 +345,8 @@ class HookNuevoTicket(db.Model):
             'numero_whatsapp': self.numero_whatsapp,
             'nombre_usuario': self.nombre_usuario,
             'received_at': self.received_at.isoformat() if self.received_at else None,
+            'processed': self.processed,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
         }
 
     def __repr__(self):
