@@ -8,76 +8,114 @@
 - Only credentials and static IDs in `constants.py`
 
 ### Date Handling Patterns
-- CSV dates from Gestión Real: DD-MM-YYYY HH:MM:SS format
-- Splynx API dates: YYYY-MM-DD HH:MM:SS format (ISO-ish)
-- Internal DB datetime: naive datetime (no timezone info)
-- Always use Argentina timezone (pytz) for comparisons: `America/Argentina/Buenos_Aires`
-- When comparing naive with aware datetimes: localize naive first with ARGENTINA_TZ
-
-### Ticket Source Differentiation
-- **GR Tickets**: `is_from_gestion_real=True` → Use `ultimo_contacto_gr` for last_update
-- **Splynx Tickets**: `is_from_gestion_real=False/None` → Use `updated_at` from API for last_update
-- Field `last_update` in DB stores the appropriate timestamp based on source
-- Sync logic in `sync_tickets_status.py` handles differentiation (lines 87-112)
+- CSV/webhook dates from Gestión Real: DD-MM-YYYY HH:MM:SS → `parse_gestion_real_date()` in `date_utils.py`
+- Splynx API dates: YYYY-MM-DD HH:MM:SS → `parse_splynx_date()` in `date_utils.py`
+- Internal DB datetime: naive datetime (no timezone)
+- Always use Argentina timezone (pytz): `America/Argentina/Buenos_Aires`
+- When comparing naive with aware datetimes: localize with `ensure_argentina_tz()`
 
 ### Interface Layer Pattern
 - All DB operations through interface layer (`app/interface/interfaces.py`)
 - IntegrityError on duplicate = expected behavior (log as info, not error)
-- On duplicate GR tickets: update `ultimo_contacto_gr` and `last_update` if changed
 - Return None on error, never raise exceptions
 - Always commit after updates
+- `TicketResponseMetricsInterface` is DEPRECATED (stub only) — data now lives in `IncidentsDetection`
 
-## Common Anti-Patterns to Watch For
+### Thread Pattern
+- Long-running operations use `threading.Thread` with app context
+- Always pass `current_app._get_current_object()` as arg to threads needing DB access
+- Use `with app.app_context():` inside the thread function
+- Exception: `thread_close_tickets` has no app context (currently broken — see known issues)
 
-1. **Mixing date formats**: CSV parsing must handle DD-MM-YYYY, not YYYY-MM-DD
-2. **Timezone-naive comparisons**: Always localize datetime before comparing with now()
-3. **Direct model access**: Must go through interface layer
-4. **Hardcoded config**: Check if value exists in `system_config` table first
-5. **Missing null checks**: Always check if datetime field exists before using it
+### Webhook Pipeline (post Selenium migration, 2026-03)
+- External system POSTs to `/api/hooks/nuevo-ticket` → stored in `hook_nuevo_ticket` table (raw)
+- Scheduler calls `/api/tickets/process_webhooks` every 3 min
+- `thread_process_webhooks` calls `process_pending_webhooks()` then `TicketManager.create_ticket()`
+- Duplicate detection uses `Fecha_Creacion` unique constraint in `IncidentsDetection`
+- After processing (success or duplicate), webhook is marked `processed=True`
+- Hooks endpoints have no auth (intentional — called by external system via trusted network)
 
-## Recent Implementations (2026-02-08)
+## Known Issues & Anti-Patterns
 
-### Differentiated Last Update Tracking
-- Added `is_from_gestion_real` (Boolean) and `ultimo_contacto_gr` (DateTime) to `IncidentsDetection`
-- CSV parsing extracts "Ultimo Contacto" column (line 409 in selenium_multi_departamentos.py)
-- Date parsing handles DD-MM-YYYY HH:MM:SS format with explicit component extraction
-- On duplicate tickets from GR: update ultimo_contacto_gr if present (interfaces.py:88-104)
-- Sync logic differentiates between GR and Splynx tickets for last_update source
+### CRITICAL: `clean_closed_ticket()` is missing
+- `thread_close_tickets()` in `thread_functions.py:59` calls `tk.clean_closed_ticket()`
+- This method does NOT exist in `TicketManager` — calling `/api/tickets/close` raises `AttributeError`
+- The `/api/tickets/close` endpoint and scheduler job were removed but the thread function was not cleaned up
 
-### CSV Date Parsing Strategy
-```python
-# Split date string: "08-02-2026 14:30:45"
-parts = ultimo_contacto.split(' ')
-date_parts = parts[0].split('-')  # ['08', '02', '2026']
-time_part = parts[1] if len(parts) > 1 else '00:00:00'
-year = date_parts[2]
-month = date_parts[1]
-day = date_parts[0]
-dt = datetime.strptime(f'{year}-{month}-{day} {time_part}', '%Y-%m-%d %H:%M:%S')
-```
+### Stale import in `views.py:204`
+- `from app import create_app` imported inside `sync_tickets_status_endpoint()` but never used
 
-## Optimization Opportunities Found
+### `TicketResponseMetrics` still queried directly in `admin_routes.py:839`
+- Direct model query bypasses interface layer; returns data from old table (may be stale/unmigrated)
+- Comment at line 752 says "Usar IncidentsDetection" but line 839 still queries TicketResponseMetrics
 
-- Date parsing logic repeated (in selenium and sync_tickets_status) → could extract to utility
-- Manual date component extraction fragile → consider dateutil.parser for robustness
-- No index on `is_from_gestion_real` field → consider adding if querying frequently
+### `HookNuevoTicket` has no unique constraint on `numero_ticket`
+- Same webhook can be received twice (retry from external system) → stored twice → both processed
+- `Fecha_Creacion` unique constraint in `IncidentsDetection` prevents incident duplicates,
+  but `hook_nuevo_ticket` grows unbounded with duplicates
 
-## WhatsApp Routes Review (2026-02-08)
+### Scheduler weekday hours hardcoded
+- `scheduler.py:43`: `if not (8 <= current_hour < 23)` is hardcoded
+- Weekend hours use ConfigHelper correctly — weekday hours do not (inconsistency)
 
-### Code Duplication Identified
-- All 5 routes have identical try-except-ValidationError-Exception pattern (90+ lines duplicated)
-- Error response format repeated 5 times with only minor differences
-- EvolutionAPIService instantiation duplicated in send_text_message route (already in WhatsAppService)
+### N+1 / full-table scan pattern in `ticket_manager.py`
+- `_check_ticket_bd()` (line 155) and `create_ticket()` (lines 303, 379) call `IncidentsInterface.get_all()`
+  then filter in Python — loads entire table on every scheduler run
+- Should use: `IncidentsDetection.query.filter_by(is_created_splynx=False).all()`
 
-### Layer Violations
-- WhatsAppService bypasses interface layer: direct OperatorConfig.query.filter_by() calls (lines 40, 54, 365, 394)
-- Should use OperatorConfigInterface.get_by_person_id() and .get_all() instead
+### `datetime.utcnow()` in `webhook_interface.py:68`
+- Inconsistent timezone: rest of app uses naive datetimes; `processed_at` uses utcnow
+- Should use `datetime.now()` for consistency
 
-### Security Issues
-- No authentication on any WhatsApp endpoint (should have @login_required or @admin_required)
-- Health check endpoint exposes EVOLUTION_API_BASE_URL publicly (line 499)
-- No rate limiting on bulk message endpoint (could spam operators)
+### Direct `OperatorConfig.query` in `ticket_manager.py` (lines 749, 1160)
+- Bypasses interface layer — should use `OperatorConfigInterface`
 
-### Patterns to Extract
-- Error handling decorator pattern could eliminate 90% of route code duplication
-- EvolutionAPIService instantiation should be centralized (already in WhatsAppService)
+## Post-Selenium Migration Status (reviewed 2026-03)
+- thread_close_tickets / clean_closed_ticket / all_flow / thread_download_csv: ALL GONE - migration is clean
+- No broken imports from removed modules found anywhere in app/
+- `is_from_gestion_real` and `ultimo_contacto_gr` dropped from DB by migration `b2c3d4e5f6a7`
+- Migration chain: eb1116c82879 → a8c2d4e6f0b1 → f0fb571414ca → a1b2c3d4e5f6 → b2c3d4e5f6a7
+- All scheduler jobs reference valid endpoints: /api/tickets/process_webhooks, assign_unassigned, alert_overdue, end_of_shift_notifications, auto_unassign_after_shift, sync_status, import_existing
+
+## New Issues Found (2026-03 review)
+
+### `import_existing_tickets.py` has its own `parse_splynx_date` (duplicate)
+- `app/utils/import_existing_tickets.py:15-23` defines `parse_splynx_date` locally
+- `app/utils/date_utils.py` already has the canonical `parse_splynx_date`
+- Should import from `date_utils` instead of redeclaring
+
+### `import_existing_tickets.py` uses `import logging` not centralized logger
+- Line 11: `import logging` + `logger = logging.getLogger(__name__)`
+- Should use `from app.utils.logger import get_logger`; `logger = get_logger(__name__)`
+
+### `sync_tickets_status.py` uses `import logging` not centralized logger
+- Same anti-pattern as above, line 15-17
+
+### `auto_unassign_after_shift` uses wrong Splynx field name
+- `ticket_manager.py:1044`: `ticket.get('assigned_to')` — Splynx API returns `assign_to`
+- The same function at line 477 correctly uses `ticket.get('assign_to', 0)`
+- This causes `assigned_to` to always be `None` → schedules never fetched → no desassignment
+
+### ConfigHelper has in-process cache — cache never invalidates between requests
+- `config_helper.py:14`: `_cache = {}` is a class-level dict (shared singleton across threads)
+- Config changes via admin panel won't take effect until process restart
+- Consider adding TTL or invalidating cache when `config/<key>` PUT succeeds
+
+### `constants.py` has hardcoded DB password fallback
+- `constants.py:94`: `DB_PASSWORD = os.getenv('DB_PASSWORD', '1234')`
+- Hardcoded default credential is a security concern; should use `None` as default
+
+### Direct model access in admin_routes.py (acceptable pattern there)
+- `admin_routes.py` uses `IncidentsDetection.query` directly in many places — this is by design
+- The admin layer is NOT going through the interface layer — it's using SQLAlchemy directly
+- This is a tradeoff; not critical but inconsistent with pattern elsewhere
+
+## Common Routes/Files Reference
+- Routes: `app/routes/` (views.py, admin_routes.py, hooks_routes.py, whatsapp_routes.py, auth_routes.py)
+- Auth decorators: `login_required`, `admin_required` defined in `auth_routes.py`, used in `whatsapp_routes.py`
+- Thread functions: `app/routes/thread_functions.py` (all background work goes here)
+- Webhook entry: `app/routes/hooks_routes.py`
+- Webhook processing: `app/services/webhook_processor.py`
+- Date utilities: `app/utils/date_utils.py`
+- `parse_gestion_real_date` still used in `sync_tickets_status.py` as fallback for `Fecha_Creacion`
+- Duplicate `parse_splynx_date` in `import_existing_tickets.py` (should use `date_utils` version)

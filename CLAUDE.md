@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Agent Usage Policy
+
+**Always use specialized agents** for the following tasks — do not perform them manually:
+
+- **Git commits and pushes**: Use the `git-commit-push` agent
+- **Backend code review and optimization**: Use the `backend-route-optimizer` agent
+- **Cross-project validation**: Use the `cross-project-feature-validator` agent
+- **VPS deployment monitoring**: Use the `vps-deployment-monitor` agent
+- **Database query optimization**: Use the `database-query-optimizer` agent
+- **Complex multi-step tasks**: Use the `general-purpose` agent
+- **Codebase exploration**: Use the `Explore` agent
+- **Implementation planning**: Use the `Plan` agent
+
+When multiple independent tasks need to be done, launch agents in parallel to maximize efficiency.
+
 ## Project Overview
 
 App Splynx is an automated ticket management system that integrates with Splynx ISP management platform and Gestión Real ticketing system. The system automatically assigns tickets to operators using fair distribution algorithms, sends WhatsApp notifications, and tracks response times.
