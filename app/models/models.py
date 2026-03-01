@@ -201,7 +201,8 @@ class TicketReassignmentHistory(db.Model):
     reassignment_type = db.Column(db.String(50))  # 'auto_unassign', 'manual', 'end_of_shift', etc.
     created_at = db.Column(db.DateTime, default=datetime.now)
     created_by = db.Column(db.String(100))  # 'system', 'admin', username
-    
+    notification_sent = db.Column(db.Boolean, default=False)  # Si se envió notificación WhatsApp
+
     def __repr__(self):
         return f'<TicketReassignment ticket_id: {self.ticket_id}, from: {self.from_operator_id} to: {self.to_operator_id}>'
 

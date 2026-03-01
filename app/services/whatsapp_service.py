@@ -276,6 +276,78 @@ _Sistema de Tickets Splynx_"""
         except Exception as e:
             resultado["error"] = str(e)
             logger.error(f"❌ Excepción enviando notificación de asignación: {e}")
+
+        return resultado
+
+    def send_ticket_reassignment_notification(
+        self,
+        person_id: int,
+        ticket_id: str,
+        subject: str,
+        customer_name: str,
+        from_operator_name: str,
+        priority: str = "medium"
+    ) -> Dict[str, Any]:
+        """
+        Envía notificación cuando un ticket es reasignado a un operador.
+        Se diferencia de send_ticket_assignment_notification en que indica
+        que el ticket viene de otro operador.
+        """
+        phone_number = self.get_operator_phone(person_id)
+        operator_name = self.get_operator_name(person_id)
+
+        resultado = {
+            "person_id": person_id,
+            "operator_name": operator_name,
+            "phone_number": phone_number,
+            "ticket_id": ticket_id,
+            "success": False,
+            "error": None
+        }
+
+        if not phone_number:
+            resultado["error"] = "Número de WhatsApp no configurado"
+            return resultado
+
+        priority_emoji = {
+            "low": "🟢",
+            "medium": "🟡",
+            "high": "🟠",
+            "urgent": "🔴"
+        }.get(priority.lower(), "🟡")
+
+        message = f"""🔄 *TICKET REASIGNADO*
+
+Hola {operator_name},
+
+Se te ha reasignado un ticket que estaba con {from_operator_name}:
+
+{priority_emoji} *Ticket #{ticket_id}*
+👤 Cliente: {customer_name}
+📝 Asunto: {subject}
+⚡ Prioridad: {priority.capitalize()}
+👥 Operador anterior: {from_operator_name}
+
+Por favor, revisa y atiende este ticket lo antes posible.
+
+_Sistema de Tickets Splynx_"""
+
+        try:
+            response = self.evolution_api.send_text_message(
+                phone_number=phone_number,
+                message=message
+            )
+
+            if response:
+                resultado["success"] = True
+                logger.info(f"✅ Notificación de reasignación enviada a {operator_name} - Ticket #{ticket_id} (desde {from_operator_name})")
+            else:
+                resultado["error"] = "Error en respuesta de Evolution API"
+                logger.error(f"❌ Error enviando notificación de reasignación a {operator_name}")
+
+        except Exception as e:
+            resultado["error"] = str(e)
+            logger.error(f"❌ Excepción enviando notificación de reasignación: {e}")
         
         return resultado
     

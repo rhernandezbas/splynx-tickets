@@ -88,37 +88,55 @@ def sync_tickets_status():
                         old_name = _get_operator_name(old_assigned_to)
                         new_name = _get_operator_name(new_assigned_to)
 
+                        # Determinar si es primera asignación o reasignación
+                        is_reassignment = old_assigned_to is not None and old_assigned_to != 0
+
+                        # Notificar al nuevo operador por WhatsApp
+                        notification_sent = False
+                        if new_assigned_to and ConfigHelper.is_whatsapp_enabled():
+                            try:
+                                from app.services.whatsapp_service import WhatsAppService
+                                whatsapp_service = WhatsAppService()
+
+                                if is_reassignment:
+                                    notif_resultado = whatsapp_service.send_ticket_reassignment_notification(
+                                        person_id=new_assigned_to,
+                                        ticket_id=ticket_id,
+                                        subject=ticket.Asunto or 'Sin asunto',
+                                        customer_name=ticket.Cliente_Nombre or 'Cliente desconocido',
+                                        from_operator_name=old_name,
+                                        priority=ticket.Prioridad or 'medium'
+                                    )
+                                else:
+                                    notif_resultado = whatsapp_service.send_ticket_assignment_notification(
+                                        person_id=new_assigned_to,
+                                        ticket_id=ticket_id,
+                                        subject=ticket.Asunto or 'Sin asunto',
+                                        customer_name=ticket.Cliente_Nombre or 'Cliente desconocido',
+                                        priority=ticket.Prioridad or 'medium'
+                                    )
+
+                                notification_sent = notif_resultado["success"]
+                                if notification_sent:
+                                    logger.info(f"📱 Notificación {'de reasignación' if is_reassignment else 'de asignación'} enviada a {new_name} para ticket {ticket_id}")
+                                else:
+                                    logger.error(f"❌ Error enviando notificación: {notif_resultado.get('error', 'Unknown')}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ No se pudo enviar notificación WhatsApp: {e}")
+
                         ReassignmentHistoryInterface.create({
                             'ticket_id': str(ticket_id),
                             'from_operator_id': old_assigned_to,
                             'from_operator_name': old_name,
                             'to_operator_id': new_assigned_to,
                             'to_operator_name': new_name,
-                            'reason': 'Cambio detectado en Splynx durante sincronización',
+                            'reason': 'Reasignación detectada en Splynx' if is_reassignment else 'Asignación detectada en Splynx',
                             'reassignment_type': 'splynx_sync',
-                            'created_by': 'system'
+                            'created_by': 'system',
+                            'notification_sent': notification_sent
                         })
                         reassigned_count += 1
-                        logger.info(f"🔄 Ticket {ticket_id}: reasignado {old_name} ({old_assigned_to}) → {new_name} ({new_assigned_to})")
-
-                        # Notificar al nuevo operador por WhatsApp
-                        if new_assigned_to and ConfigHelper.is_whatsapp_enabled():
-                            try:
-                                from app.services.whatsapp_service import WhatsAppService
-                                whatsapp_service = WhatsAppService()
-                                notif_resultado = whatsapp_service.send_ticket_assignment_notification(
-                                    person_id=new_assigned_to,
-                                    ticket_id=ticket_id,
-                                    subject=ticket.Asunto or 'Sin asunto',
-                                    customer_name=ticket.Cliente_Nombre or 'Cliente desconocido',
-                                    priority=ticket.Prioridad or 'medium'
-                                )
-                                if notif_resultado["success"]:
-                                    logger.info(f"📱 Notificación de reasignación enviada a {new_name} para ticket {ticket_id}")
-                                else:
-                                    logger.error(f"❌ Error enviando notificación de reasignación: {notif_resultado.get('error', 'Unknown')}")
-                            except Exception as e:
-                                logger.warning(f"⚠️ No se pudo enviar notificación WhatsApp de reasignación: {e}")
+                        logger.info(f"🔄 Ticket {ticket_id}: {'reasignado' if is_reassignment else 'asignado'} {old_name} ({old_assigned_to}) → {new_name} ({new_assigned_to}) [WhatsApp: {'✅' if notification_sent else '❌'}]")
 
                     # Calcular tiempo desde última actualización (no desde creación)
                     # Si el ticket fue respondido/actualizado, el contador se resetea
