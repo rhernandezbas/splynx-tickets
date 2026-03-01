@@ -47,9 +47,29 @@ summary: "Reglas técnicas del algoritmo de distribución justa de tickets entre
 - Fines de semana: 9:00 AM - 9:00 PM (configurable en DB)
 - Los jobs del scheduler NO se ejecutan fuera de estos horarios
 
+## Sincronización de asignaciones desde Splynx
+- El job `sync_tickets_status` (cada 5 min) detecta cambios de `assign_to` en Splynx
+- Si `assigned_to` en Splynx difiere de la BD local, se actualiza `ticket.assigned_to`
+- Cada cambio se registra en `ticket_reassignment_history` con `reassignment_type='splynx_sync'`
+- El campo `notification_sent` (Boolean) registra si se envió la notificación WhatsApp
+- **Mensajes diferenciados**:
+  - Primera asignación (`old_assigned_to` es None/0): usa `send_ticket_assignment_notification` ("NUEVO TICKET ASIGNADO")
+  - Reasignación (`old_assigned_to` tiene valor): usa `send_ticket_reassignment_notification` ("TICKET REASIGNADO" + operador anterior)
+- Respeta `ConfigHelper.is_whatsapp_enabled()` y falla silenciosamente sin romper el sync
+- La API de Splynx usa el campo `assign_to` (no `assigned_to`)
+
+## Historial de reasignaciones
+- Tabla `ticket_reassignment_history` registra todos los cambios de asignación
+- Campos: `ticket_id`, `from/to_operator_id`, `from/to_operator_name`, `reason`, `reassignment_type`, `notification_sent`, `created_by`
+- Tipos de reasignación: `splynx_sync`, `auto_unassign_after_shift`, `manual`
+- Consultar vía `GET /api/admin/reassignment-history?ticket_id=X`
+
 code_refs:
   - "app/services/ticket_manager.py"
   - "app/utils/schedule_helper.py"
   - "app/utils/scheduler.py"
+  - "app/utils/sync_tickets_status.py"
+  - "app/services/whatsapp_service.py"
   - "app/models/models.py"
   - "app/interface/interfaces.py"
+  - "app/interface/reassignment_history.py"
