@@ -7,7 +7,7 @@ OPTIMIZADO: Usa SplynxServicesSingleton para evitar múltiples logins
 
 from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.services.whatsapp_service import WhatsAppService
-from app.interface.interfaces import TicketResponseMetricsInterface
+from app.interface.interfaces import TicketResponseMetricsInterface, IncidentsInterface
 from app.utils.schedule_helper import ScheduleHelper
 from app.utils.config_helper import ConfigHelper
 from datetime import datetime
@@ -412,18 +412,19 @@ class TicketManager:
         return created_tickets if created_tickets else None
 
     def check_and_alert_overdue_tickets(self, threshold_minutes=None):
-        """Verifica tickets asignados que superen el tiempo límite y envía alertas por WhatsApp
-        Agrupa todos los tickets vencidos por operador y envía un solo mensaje con la lista completa
-        
+        """Verifica tickets asignados que superen el tiempo límite y envía alertas por WhatsApp.
+        También envía pre-alertas para tickets próximos a vencerse.
+        Agrupa todos los tickets por operador y envía un solo mensaje con la lista completa.
+
         Lógica:
-        - Solo alerta si el ticket tiene más de X minutos desde creación (configurable)
-        - NO alerta si el ticket fue actualizado hace menos de X minutos (configurable)
+        - Pre-alerta: tickets entre (threshold - pre_alert_minutes) y threshold minutos sin actualizar
+        - Alerta vencido: tickets con más de threshold minutos sin actualizar
+        - Anti-spam usa IncidentsDetection (last_alert_sent_at / pre_alert_sent_at)
         - Registra métricas en la base de datos
-        - Usa nombres de operadores en los mensajes
-        
+
         Args:
             threshold_minutes: Tiempo límite en minutos (si es None, lee de BD)
-            
+
         Returns:
             dict: Resumen de la operación con estadísticas
         """
@@ -433,50 +434,56 @@ class TicketManager:
             TIMEZONE
         )
         from app.services.whatsapp_service import WhatsAppService
-        from app.interface.interfaces import TicketResponseMetricsInterface
+        from app.interface.interfaces import IncidentsInterface
+        from app.utils.config import db
         from datetime import datetime, timedelta
         from collections import defaultdict
         import pytz
-        
+
         # Leer configuración desde BD si no se especifica
         if threshold_minutes is None:
             threshold_minutes = ConfigHelper.get_ticket_alert_threshold()
-        
-        TICKET_UPDATE_THRESHOLD_MINUTES = ConfigHelper.get_ticket_update_threshold()
+
         TICKET_RENOTIFICATION_INTERVAL_MINUTES = ConfigHelper.get_renotification_interval()
-        
+        pre_alert_minutes = ConfigHelper.get_pre_alert_minutes()
+        pre_alert_threshold = threshold_minutes - pre_alert_minutes
+
         resultado = {
             "total_tickets_revisados": 0,
             "tickets_vencidos": 0,
+            "tickets_pre_alerta": 0,
             "alertas_enviadas": 0,
+            "pre_alertas_enviadas": 0,
             "errores": 0,
             "detalles": []
         }
-        
+
         try:
             # Inicializar servicio de WhatsApp
             whatsapp_service = WhatsAppService()
-            
+
             # Obtener todos los tickets asignados del grupo de Soporte Técnico
             tickets = self.splynx.get_assigned_tickets(group_id=SPLYNX_SUPPORT_GROUP_ID)
             resultado["total_tickets_revisados"] = len(tickets)
-            
+
             if not tickets:
                 logger.info("No hay tickets asignados para revisar")
                 return resultado
-            
+
             logger.info("="*60)
             logger.info(f"🔍 REVISANDO {len(tickets)} TICKETS ASIGNADOS")
             logger.info(f"⏱️  Umbral de alerta: {threshold_minutes} minutos")
+            logger.info(f"⏰ Pre-alerta: {pre_alert_threshold} minutos (aviso {pre_alert_minutes} min antes)")
             logger.info("="*60)
-            
+
             # Obtener hora actual en Argentina
             tz_argentina = pytz.timezone(TIMEZONE)
             now = datetime.now(tz_argentina)
-            
-            # Diccionario para agrupar tickets por operador
-            tickets_por_operador = defaultdict(list)
-            
+
+            # Diccionarios para agrupar tickets por operador
+            tickets_por_operador = defaultdict(list)       # Tickets vencidos
+            pre_alert_por_operador = defaultdict(list)     # Tickets para pre-alerta
+
             for ticket in tickets:
                 ticket_id = ticket.get('id')
                 subject = ticket.get('subject', 'Sin asunto')
@@ -485,34 +492,31 @@ class TicketManager:
                 created_at_str = ticket.get('created_at', '')
                 updated_at_str = ticket.get('updated_at', '')
                 status_id = str(ticket.get('status_id', ''))
-                
+
                 try:
                     # Parsear fecha de creación del ticket
-                    # Formato esperado: "YYYY-MM-DD HH:MM:SS"
                     created_at = datetime.strptime(created_at_str, '%Y-%m-%d %H:%M:%S')
                     created_at = tz_argentina.localize(created_at)
-                    
+
                     # Parsear fecha de última actualización
                     if updated_at_str:
                         try:
                             updated_at = datetime.strptime(updated_at_str, '%Y-%m-%d %H:%M:%S')
                             updated_at = tz_argentina.localize(updated_at)
                         except ValueError:
-                            # Si hay error parseando updated_at, usar now
                             logger.warning(f"⚠️  Error parseando updated_at para ticket {ticket_id}, usando now")
                             updated_at = now
                     else:
-                        # Si no hay updated_at, usar now
                         updated_at = now
-                    
+
                     # Calcular tiempo desde última actualización hasta ahora
                     time_since_update = now - updated_at
                     minutes_since_update = int(time_since_update.total_seconds() / 60)
-                    
+
                     # Calcular tiempo total desde creación (para métricas)
                     time_since_creation = now - created_at
                     minutes_elapsed = int(time_since_creation.total_seconds() / 60)
-                    
+
                     # Verificar si el ticket está en estado OutHouse (ID 6)
                     from app.utils.constants import OUTHOUSE_STATUS_ID
                     OUTHOUSE_NO_ALERT_MINUTES = ConfigHelper.get_outhouse_no_alert_minutes()
@@ -520,30 +524,31 @@ class TicketManager:
                         if minutes_since_update < OUTHOUSE_NO_ALERT_MINUTES:
                             logger.info(f"🏠 Ticket {ticket_id} en estado OutHouse - No se alerta hasta {OUTHOUSE_NO_ALERT_MINUTES} minutos ({minutes_since_update} min transcurridos)")
                             continue
-                    
-                    # Verificar si supera el umbral desde la última actualización
-                    # Un ticket está vencido si no ha sido actualizado en X minutos
+
+                    # Verificar si el operador está en su horario de alertas
+                    if not ScheduleHelper.is_operator_available(assigned_to, schedule_type='alert', current_time=now):
+                        logger.info(f"⏰ Operador {assigned_to} fuera de horario de alertas - Ticket {ticket_id} omitido")
+                        continue
+
+                    # Buscar ticket local para anti-spam
+                    local_ticket = IncidentsInterface.find_by_ticket_id(str(ticket_id))
+
+                    # --- ALERTA DE TICKET VENCIDO ---
                     if minutes_since_update >= threshold_minutes:
-                        should_alert = True
-                        logger.info(f"⚠️  Ticket {ticket_id} vencido: {minutes_since_update} min sin actualización (umbral: {threshold_minutes} min, tiempo total: {minutes_elapsed} min)")
+                        logger.info(f"⚠️  Ticket {ticket_id} vencido: {minutes_since_update} min sin actualización (umbral: {threshold_minutes} min)")
                         resultado["tickets_vencidos"] += 1
-                        
-                        # Verificar si ya fue notificado recientemente (ANTI-SPAM)
-                        existing_metric = TicketResponseMetricsInterface.get_by_ticket_id(str(ticket_id))
+
+                        # Anti-spam: verificar last_alert_sent_at en IncidentsDetection
                         should_notify = True
-                        
-                        if existing_metric and existing_metric.last_alert_sent_at:
-                            # Calcular tiempo desde última notificación
-                            last_alert = existing_metric.last_alert_sent_at
+                        if local_ticket and local_ticket.last_alert_sent_at:
+                            last_alert = local_ticket.last_alert_sent_at
                             if last_alert.tzinfo is None:
                                 last_alert = tz_argentina.localize(last_alert)
                             else:
-                                # Convertir a timezone de Argentina si tiene otro timezone
                                 last_alert = last_alert.astimezone(tz_argentina)
-                            
+
                             minutes_since_last_alert = (now - last_alert).total_seconds() / 60
-                            
-                            # Si el tiempo es negativo, significa que hay un problema de timezone - alertar de todos modos
+
                             if minutes_since_last_alert < 0:
                                 logger.warning(f"⚠️  Ticket {ticket_id} tiene last_alert en el futuro ({int(minutes_since_last_alert)} min) - forzando alerta")
                                 should_notify = True
@@ -559,18 +564,16 @@ class TicketManager:
                                     "minutes_since_last_alert": int(minutes_since_last_alert)
                                 })
                                 continue
-                        
+
                         if not should_notify:
                             continue
-                        
+
                         # Obtener información del cliente
                         customer_info = self.splynx.search_customer(str(customer_id))
                         customer_name = customer_info.get('name', 'Cliente desconocido') if customer_info else 'Cliente desconocido'
-                        
-                        # Obtener nombre del operador
+
                         operator_name = whatsapp_service.get_operator_name(assigned_to)
-                        
-                        # Preparar datos del ticket
+
                         ticket_data = {
                             'id': ticket_id,
                             'subject': subject,
@@ -579,35 +582,10 @@ class TicketManager:
                             'minutes_elapsed': minutes_elapsed,
                             'operator_name': operator_name
                         }
-                        
-                        # Registrar o actualizar métrica en la base de datos
-                        if not existing_metric:
-                            # Crear nueva métrica (se actualizará last_alert_sent_at al enviar)
-                            metric_data = {
-                                'ticket_id': str(ticket_id),
-                                'assigned_to': assigned_to,
-                                'customer_id': str(customer_id),
-                                'customer_name': customer_name,
-                                'subject': subject,
-                                'created_at': created_at,
-                                'first_alert_sent_at': None,  # Se actualizará al enviar
-                                'last_alert_sent_at': None,   # Se actualizará al enviar
-                                'response_time_minutes': minutes_elapsed,
-                                'alert_count': 0,  # Se incrementará al enviar
-                                'exceeded_threshold': True
-                            }
-                            TicketResponseMetricsInterface.create(metric_data)
-                            logger.info(f"📊 Métrica creada para ticket {ticket_id}")
-                        
-                        # Verificar si el operador está en su horario de alertas (schedule_type='alert')
-                        if not ScheduleHelper.is_operator_available(assigned_to, schedule_type='alert', current_time=now):
-                            logger.info(f"⏰ Operador {assigned_to} fuera de horario de alertas - No se envía notificación para ticket {ticket_id}")
-                            continue
-                        
-                        # Agrupar por operador (se actualizará métrica después de enviar)
+
                         if whatsapp_service.get_operator_phone(assigned_to):
                             tickets_por_operador[assigned_to].append(ticket_data)
-                            logger.info(f"📋 Ticket {ticket_id} agregado a lista de {operator_name} - {minutes_elapsed} min (en horario de alertas)")
+                            logger.info(f"📋 Ticket {ticket_id} agregado a lista vencidos de {operator_name} - {minutes_elapsed} min")
                         else:
                             logger.warning(f"⚠️  {operator_name} no tiene número de WhatsApp configurado")
                             resultado["detalles"].append({
@@ -617,64 +595,121 @@ class TicketManager:
                                 "minutes_elapsed": minutes_elapsed,
                                 "estado": "SIN_NUMERO_WHATSAPP"
                             })
-                    
+
+                    # --- PRE-ALERTA ---
+                    elif minutes_since_update >= pre_alert_threshold and minutes_since_update < threshold_minutes:
+                        # Solo enviar pre-alerta si el ticket local existe y no fue pre-alertado
+                        if local_ticket and local_ticket.pre_alert_sent_at is None:
+                            resultado["tickets_pre_alerta"] += 1
+
+                            customer_info = self.splynx.search_customer(str(customer_id))
+                            customer_name = customer_info.get('name', 'Cliente desconocido') if customer_info else 'Cliente desconocido'
+
+                            operator_name = whatsapp_service.get_operator_name(assigned_to)
+
+                            ticket_data = {
+                                'id': ticket_id,
+                                'subject': subject,
+                                'customer_name': customer_name,
+                                'created_at': created_at_str,
+                                'minutes_elapsed': minutes_since_update,
+                                'operator_name': operator_name
+                            }
+
+                            if whatsapp_service.get_operator_phone(assigned_to):
+                                pre_alert_por_operador[assigned_to].append(ticket_data)
+                                logger.info(f"⏰ Ticket {ticket_id} agregado a pre-alerta de {operator_name} - {minutes_since_update} min (vence en ~{threshold_minutes - minutes_since_update} min)")
+                            else:
+                                logger.warning(f"⚠️  {operator_name} no tiene número de WhatsApp para pre-alerta")
+                        elif local_ticket and local_ticket.pre_alert_sent_at is not None:
+                            logger.info(f"⏭️  Ticket {ticket_id} ya fue pre-alertado - omitiendo")
+                        elif not local_ticket:
+                            logger.info(f"ℹ️  Ticket {ticket_id} no encontrado en BD local - omitiendo pre-alerta")
+
                 except ValueError as e:
                     logger.warning(f"⚠️  Error parseando fecha del ticket {ticket_id}: {e}")
                     resultado["errores"] += 1
                 except Exception as e:
                     logger.error(f"❌ Error procesando ticket {ticket_id}: {e}")
                     resultado["errores"] += 1
-            
+
             # Enviar alertas agrupadas por operador (si WhatsApp está habilitado)
-            from app.utils.config_helper import ConfigHelper
-            
             if ConfigHelper.is_whatsapp_enabled():
                 logger.info("="*60)
                 logger.info(f"📤 ENVIANDO ALERTAS AGRUPADAS")
                 logger.info("="*60)
-                
-                for assigned_to, tickets_list in tickets_por_operador.items():
-                    # Usar WhatsAppService para enviar alertas
-                    envio_resultado = whatsapp_service.send_overdue_tickets_alert(assigned_to, tickets_list)
-                    
+
+                # --- Enviar PRE-ALERTAS ---
+                for assigned_to, tickets_list in pre_alert_por_operador.items():
+                    minutes_remaining = threshold_minutes - pre_alert_threshold
+                    envio_resultado = whatsapp_service.send_pre_alert(assigned_to, tickets_list, minutes_remaining)
+
                     if envio_resultado["success"]:
-                        resultado["alertas_enviadas"] += 1
-                        
-                        # Actualizar métricas de todos los tickets enviados
+                        resultado["pre_alertas_enviadas"] += 1
+
+                        # Actualizar pre_alert_sent_at en cada ticket local
                         for ticket_data in tickets_list:
-                            ticket_id = str(ticket_data['id'])
-                            minutes_elapsed = ticket_data['minutes_elapsed']
-                            
-                            # Actualizar last_alert_sent_at y alert_count (crea métrica si no existe)
-                            update_success = TicketResponseMetricsInterface.update_alert_sent(
-                                ticket_id=ticket_id,
-                                response_time_minutes=minutes_elapsed,
-                                assigned_to=assigned_to,
-                                customer_id=ticket_data.get('customer_id'),
-                                customer_name=ticket_data.get('customer_name'),
-                                subject=ticket_data.get('subject'),
-                                created_at=None  # Se usará datetime.now() si no existe
-                            )
-                            
-                            if update_success:
-                                logger.info(f"   ✅ Ticket {ticket_id}: last_alert_sent_at actualizado")
-                            else:
-                                logger.error(f"   ❌ Ticket {ticket_id}: ERROR al actualizar last_alert_sent_at")
-                            
+                            tid = str(ticket_data['id'])
+                            local_t = IncidentsInterface.find_by_ticket_id(tid)
+                            if local_t:
+                                local_t.pre_alert_sent_at = datetime.now(tz_argentina).replace(tzinfo=None)
+                                db.session.commit()
+                                logger.info(f"   ✅ Ticket {tid}: pre_alert_sent_at actualizado")
+
                             resultado["detalles"].append({
-                                "ticket_id": ticket_id,
+                                "ticket_id": tid,
                                 "subject": ticket_data['subject'],
                                 "assigned_to": assigned_to,
-                                "minutes_elapsed": minutes_elapsed,
+                                "minutes_elapsed": ticket_data['minutes_elapsed'],
+                                "estado": "PRE_ALERTA_ENVIADA"
+                            })
+                    else:
+                        resultado["errores"] += 1
+                        for ticket_data in tickets_list:
+                            resultado["detalles"].append({
+                                "ticket_id": ticket_data['id'],
+                                "subject": ticket_data['subject'],
+                                "assigned_to": assigned_to,
+                                "minutes_elapsed": ticket_data['minutes_elapsed'],
+                                "estado": "ERROR_PRE_ALERTA",
+                                "error": envio_resultado.get("error")
+                            })
+
+                # --- Enviar ALERTAS DE VENCIDOS ---
+                for assigned_to, tickets_list in tickets_por_operador.items():
+                    envio_resultado = whatsapp_service.send_overdue_tickets_alert(assigned_to, tickets_list)
+
+                    if envio_resultado["success"]:
+                        resultado["alertas_enviadas"] += 1
+
+                        # Actualizar last_alert_sent_at en IncidentsDetection
+                        for ticket_data in tickets_list:
+                            tid = str(ticket_data['id'])
+                            local_t = IncidentsInterface.find_by_ticket_id(tid)
+                            if local_t:
+                                now_naive = datetime.now(tz_argentina).replace(tzinfo=None)
+                                if not local_t.first_alert_sent_at:
+                                    local_t.first_alert_sent_at = now_naive
+                                local_t.last_alert_sent_at = now_naive
+                                local_t.exceeded_threshold = True
+                                local_t.response_time_minutes = ticket_data['minutes_elapsed']
+                                db.session.commit()
+                                logger.info(f"   ✅ Ticket {tid}: last_alert_sent_at actualizado en IncidentsDetection")
+                            else:
+                                logger.warning(f"   ⚠️  Ticket {tid}: no encontrado en BD local para actualizar métricas")
+
+                            resultado["detalles"].append({
+                                "ticket_id": tid,
+                                "subject": ticket_data['subject'],
+                                "assigned_to": assigned_to,
+                                "minutes_elapsed": ticket_data['minutes_elapsed'],
                                 "phone": envio_resultado["phone_number"],
                                 "estado": "ALERTA_ENVIADA"
                             })
-                        
+
                         logger.info(f"✅ Métricas actualizadas para {len(tickets_list)} tickets")
                     else:
                         resultado["errores"] += 1
-                        
-                        # Marcar todos los tickets como error
                         for ticket_data in tickets_list:
                             resultado["detalles"].append({
                                 "ticket_id": ticket_data['id'],
@@ -685,19 +720,21 @@ class TicketManager:
                                 "error": envio_resultado.get("error")
                             })
             else:
-                logger.info(f"ℹ️  WhatsApp deshabilitado - no se enviaron alertas de tickets vencidos")
-                logger.info(f"   Se encontraron {len(tickets_por_operador)} operadores con tickets vencidos")
-            
+                logger.info(f"ℹ️  WhatsApp deshabilitado - no se enviaron alertas")
+                logger.info(f"   Vencidos: {len(tickets_por_operador)} operadores | Pre-alertas: {len(pre_alert_por_operador)} operadores")
+
             logger.info("="*60)
             logger.info(f"✅ REVISIÓN COMPLETADA")
             logger.info(f"   Total revisados: {resultado['total_tickets_revisados']}")
             logger.info(f"   Tickets vencidos: {resultado['tickets_vencidos']}")
-            logger.info(f"   Operadores alertados: {resultado['alertas_enviadas']}")
+            logger.info(f"   Tickets pre-alerta: {resultado['tickets_pre_alerta']}")
+            logger.info(f"   Alertas vencidos enviadas: {resultado['alertas_enviadas']}")
+            logger.info(f"   Pre-alertas enviadas: {resultado['pre_alertas_enviadas']}")
             logger.info(f"   Errores: {resultado['errores']}")
             logger.info("="*60)
-            
+
             return resultado
-            
+
         except Exception as e:
             logger.error(f"❌ Error general en revisión de tickets: {e}")
             resultado["errores"] = resultado["total_tickets_revisados"]

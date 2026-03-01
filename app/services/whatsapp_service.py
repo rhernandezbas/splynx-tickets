@@ -102,6 +102,56 @@ class WhatsAppService:
         
         return resultado
     
+    def send_pre_alert(self, person_id: int, tickets_list: List[Dict[str, Any]], minutes_remaining: int = 15) -> Dict[str, Any]:
+        """
+        Envía pre-alerta de tickets próximos a vencerse para un operador
+
+        Args:
+            person_id: ID del operador
+            tickets_list: Lista de tickets próximos a vencer
+            minutes_remaining: Minutos restantes antes del vencimiento
+
+        Returns:
+            dict: Resultado del envío con estadísticas
+        """
+        phone_number = self.get_operator_phone(person_id)
+        operator_name = self.get_operator_name(person_id)
+
+        resultado = {
+            "person_id": person_id,
+            "operator_name": operator_name,
+            "phone_number": phone_number,
+            "tickets_count": len(tickets_list),
+            "success": False,
+            "error": None
+        }
+
+        if not phone_number:
+            resultado["error"] = "Número de WhatsApp no configurado"
+            logger.warning(f"⚠️  {operator_name} no tiene número de WhatsApp configurado")
+            return resultado
+
+        try:
+            response = self.evolution_api.send_pre_alert_tickets(
+                phone_number=phone_number,
+                tickets_list=tickets_list,
+                operator_name=operator_name,
+                minutes_remaining=minutes_remaining
+            )
+
+            if response:
+                resultado["success"] = True
+                logger.info(f"✅ Pre-alerta enviada a {operator_name} ({len(tickets_list)} tickets, {minutes_remaining} min restantes)")
+            else:
+                resultado["error"] = "Error en respuesta de Evolution API"
+                logger.error(f"❌ Error enviando pre-alerta a {operator_name}")
+
+        except Exception as e:
+            resultado["error"] = str(e)
+            logger.error(f"❌ Excepción enviando pre-alerta a {operator_name}: {e}")
+
+        return resultado
+
     def send_end_of_shift_summary(self, person_id: int, tickets_list: List[Dict[str, Any]], shift_end_time: str) -> Dict[str, Any]:
         """
         Envía resumen de fin de turno a un operador

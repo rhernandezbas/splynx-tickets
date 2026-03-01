@@ -29,6 +29,7 @@ class IncidentsDetection(db.Model):
     resolution_time_minutes = db.Column(db.Integer)  # Tiempo total de resolución (creación hasta cierre)
     first_alert_sent_at = db.Column(db.DateTime)  # Primera alerta enviada
     last_alert_sent_at = db.Column(db.DateTime)  # Última alerta enviada
+    pre_alert_sent_at = db.Column(db.DateTime)  # Pre-alerta enviada
     
     # Campos de auditoría
     audit_requested = db.Column(db.Boolean, default=False)  # Operador solicitó auditoría

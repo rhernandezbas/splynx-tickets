@@ -139,6 +139,52 @@ Por favor, revisa y actualiza el estado del ticket."""
         
         return self.send_text_message(phone_number, message)
     
+    def send_pre_alert_tickets(self, phone_number: str, tickets_list: list, operator_name: str = None, minutes_remaining: int = 15) -> Optional[Dict[str, Any]]:
+        """
+        Send a pre-alert message for tickets approaching the overdue threshold
+
+        Args:
+            phone_number: Phone number to send alert to
+            tickets_list: List of dictionaries containing ticket information
+            operator_name: Name of the operator (optional)
+            minutes_remaining: Minutes remaining before tickets are considered overdue
+
+        Returns:
+            dict: Response from API or None if error
+        """
+        if not tickets_list:
+            return None
+
+        total_tickets = len(tickets_list)
+
+        greeting = f"Hola *{operator_name}*,\n\n" if operator_name else ""
+
+        message = f"""⏰ *PRE-ALERTA DE TICKETS*
+
+{greeting}Tienes *{total_tickets}* ticket{'s' if total_tickets > 1 else ''} que vencerán en ~{minutes_remaining} minutos:
+
+"""
+
+        for idx, ticket_data in enumerate(tickets_list, 1):
+            ticket_id = ticket_data.get('id', 'N/A')
+            subject = ticket_data.get('subject', 'Sin asunto')
+            customer_name = ticket_data.get('customer_name', 'Cliente desconocido')
+            minutes_elapsed = ticket_data.get('minutes_elapsed', 0)
+
+            if len(subject) > 50:
+                subject = subject[:47] + "..."
+
+            message += f"""*{idx}. Ticket #{ticket_id}*
+   👤 {customer_name}
+   📝 {subject}
+   ⏱️ {minutes_elapsed} min sin actualizar
+
+"""
+
+        message += """📌 *Actualiza estos tickets para evitar que se marquen como vencidos.*"""
+
+        return self.send_text_message(phone_number, message)
+
     def send_end_of_shift_summary(self, phone_number: str, operator_name: str, tickets_list: list, shift_end_time: str) -> Optional[Dict[str, Any]]:
         """
         Send end of shift summary with all pending tickets

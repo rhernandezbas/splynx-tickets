@@ -104,6 +104,11 @@ class ConfigHelper:
         return ConfigHelper.get_int('OUTHOUSE_NO_ALERT_MINUTES', 120)
     
     @staticmethod
+    def get_pre_alert_minutes() -> int:
+        """Obtiene los minutos antes del vencimiento para enviar pre-alerta"""
+        return ConfigHelper.get_int('TICKET_PRE_ALERT_MINUTES', 15)
+
+    @staticmethod
     def is_whatsapp_enabled() -> bool:
         """Verifica si WhatsApp está habilitado"""
         return ConfigHelper.get_bool('WHATSAPP_ENABLED', True)
