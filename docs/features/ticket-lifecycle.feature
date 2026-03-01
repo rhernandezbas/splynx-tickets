@@ -109,12 +109,17 @@ Feature: Ciclo de vida de tickets
     And quedan disponibles para reasignación
 
   @status:implemented
+  @changed:2026-03-01
+  @reason:Agregada sincronización de assigned_to con historial y notificación WhatsApp
   Scenario: Sincronización de estado con Splynx
     Given existen tickets en la base de datos local
     And la API de Splynx está accesible
     When se ejecuta el job de sincronización
     Then se actualizan los estados de los tickets locales según Splynx
     And los tickets cerrados en Splynx se marcan como is_closed = True
+    And si assigned_to cambió en Splynx se actualiza en la BD local
+    And se registra el cambio en ticket_reassignment_history con tipo splynx_sync
+    And se envía notificación WhatsApp al nuevo operador asignado
 
   @status:deprecated
   @changed:2026-03-01
