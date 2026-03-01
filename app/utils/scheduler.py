@@ -75,6 +75,42 @@ def run_process_webhooks_job(app):
         logger.info("="*60)
 
 
+def run_reset_assignment_counters_job(app):
+    """Resetea los contadores de asignación al inicio de cada turno configurado.
+
+    Lee ASSIGNMENT_RESET_HOURS de system_config (CSV de horas, ej: "8,16").
+    Se ejecuta cada minuto y verifica si la hora actual coincide con una hora
+    de reset (minuto 0, con margen de ±2 minutos).
+    """
+    with app.app_context():
+        from app.utils.config_helper import ConfigHelper
+        from app.interface.interfaces import AssignmentTrackerInterface
+
+        tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+        now = datetime.now(tz_argentina)
+
+        # Leer horas de reset desde DB (default: "8,16")
+        reset_hours_str = ConfigHelper.get_str('ASSIGNMENT_RESET_HOURS', '8,16')
+        try:
+            reset_hours = [int(h.strip()) for h in reset_hours_str.split(',') if h.strip()]
+        except ValueError:
+            logger.error(f"❌ ASSIGNMENT_RESET_HOURS inválido: '{reset_hours_str}', usando default 8,16")
+            reset_hours = [8, 16]
+
+        # Verificar si estamos dentro de la ventana de reset (hora exacta, minuto 0-2)
+        if now.hour in reset_hours and now.minute <= 2:
+            logger.info("=" * 60)
+            logger.info(f"⚖️ RESET DE CONTADORES DE ASIGNACIÓN - Turno {now.hour}:00")
+
+            success = AssignmentTrackerInterface.reset_all_counts()
+            if success:
+                logger.info(f"⚖️ Contadores de asignación reseteados (turno {now.hour}:00)")
+            else:
+                logger.error(f"❌ Error al resetear contadores de asignación (turno {now.hour}:00)")
+
+            logger.info("=" * 60)
+
+
 def _cleanup_lock():
     """Limpia el archivo de lock al salir"""
     try:
@@ -179,6 +215,15 @@ def init_scheduler(app):
         replace_existing=True
     )
     
+    # Agregar job para resetear contadores de asignación por turno (cada 1 minuto)
+    scheduler.add_job(
+        func=lambda: run_reset_assignment_counters_job(app),
+        trigger=IntervalTrigger(minutes=1),
+        id='reset_assignment_counters_job',
+        name='Reset contadores de asignación por turno cada 1 minuto',
+        replace_existing=True
+    )
+
     # Iniciar el scheduler
     scheduler.start()
     _scheduler_instance = scheduler
@@ -193,6 +238,7 @@ def init_scheduler(app):
     logger.info("   - Desasignacion automatica cada 40 minutos")
     logger.info("   - Sincronizacion estado tickets cada 5 minutos")
     logger.info("   - Importacion tickets existentes cada 5 minutos")
+    logger.info("   - Reset contadores asignacion por turno cada 1 minuto")
     logger.info("Zona horaria: America/Argentina/Buenos_Aires")
     logger.info(f"PID: {os.getpid()}")
     logger.info("="*60)
