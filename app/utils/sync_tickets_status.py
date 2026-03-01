@@ -2,6 +2,7 @@
 Job para sincronizar el estado de tickets con Splynx
 Verifica si tickets están cerrados en Splynx y actualiza la BD local
 Calcula exceeded_threshold y response_time_minutes
+Sincroniza assigned_to y registra cambios en historial de reasignaciones
 OPTIMIZADO: Usa SplynxServicesSingleton para evitar múltiples logins
 """
 
@@ -11,6 +12,8 @@ from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.utils.config_helper import ConfigHelper
 from app.utils.date_utils import parse_ticket_date, parse_splynx_date, ensure_argentina_tz
 from app.utils.logger import get_logger
+from app.interface.reassignment_history import ReassignmentHistoryInterface
+from app.interface.interfaces import OperatorConfigInterface
 from datetime import datetime
 import pytz
 
@@ -19,10 +22,20 @@ logger = get_logger(__name__)
 # Timezone de Argentina
 ARGENTINA_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
+
+def _get_operator_name(person_id):
+    """Resuelve nombre del operador desde operator_config."""
+    if not person_id:
+        return 'Sin asignar'
+    op = OperatorConfigInterface.get_by_person_id(person_id)
+    return op.name if op else f'Operador {person_id}'
+
+
 def sync_tickets_status():
     """
     Sincroniza el estado de tickets abiertos con Splynx.
-    Actualiza: is_closed, closed_at, exceeded_threshold, response_time_minutes
+    Actualiza: is_closed, closed_at, exceeded_threshold, response_time_minutes, assigned_to
+    Registra cambios de asignación en historial de reasignaciones.
     """
     try:
         splynx = SplynxServicesSingleton()
@@ -40,6 +53,7 @@ def sync_tickets_status():
         
         closed_count = 0
         exceeded_count = 0
+        reassigned_count = 0
         
         for ticket in open_tickets:
             try:
@@ -65,7 +79,28 @@ def sync_tickets_status():
                         new_assigned_to = int(assigned_to_splynx) if assigned_to_splynx else None
                     else:
                         new_assigned_to = None
-                    
+
+                    # Sincronizar assigned_to si cambió en Splynx
+                    if new_assigned_to is not None and new_assigned_to != ticket.assigned_to:
+                        old_assigned_to = ticket.assigned_to
+                        ticket.assigned_to = new_assigned_to
+
+                        old_name = _get_operator_name(old_assigned_to)
+                        new_name = _get_operator_name(new_assigned_to)
+
+                        ReassignmentHistoryInterface.create({
+                            'ticket_id': str(ticket_id),
+                            'from_operator_id': old_assigned_to,
+                            'from_operator_name': old_name,
+                            'to_operator_id': new_assigned_to,
+                            'to_operator_name': new_name,
+                            'reason': 'Cambio detectado en Splynx durante sincronización',
+                            'reassignment_type': 'splynx_sync',
+                            'created_by': 'system'
+                        })
+                        reassigned_count += 1
+                        logger.info(f"🔄 Ticket {ticket_id}: reasignado {old_name} ({old_assigned_to}) → {new_name} ({new_assigned_to})")
+
                     # Calcular tiempo desde última actualización (no desde creación)
                     # Si el ticket fue respondido/actualizado, el contador se resetea
                     last_update = None
@@ -156,13 +191,14 @@ def sync_tickets_status():
                 continue
         
         db.session.commit()
-        logger.info(f"✅ Sincronización completada: {closed_count} tickets cerrados, {exceeded_count} tickets vencidos")
-        
+        logger.info(f"✅ Sincronización completada: {closed_count} cerrados, {exceeded_count} vencidos, {reassigned_count} reasignados")
+
         return {
             'success': True,
             'total_checked': len(open_tickets),
             'closed_count': closed_count,
-            'exceeded_count': exceeded_count
+            'exceeded_count': exceeded_count,
+            'reassigned_count': reassigned_count
         }
         
     except Exception as e:
