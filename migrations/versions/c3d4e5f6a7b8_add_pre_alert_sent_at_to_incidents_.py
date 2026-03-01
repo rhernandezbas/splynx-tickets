@@ -1,7 +1,7 @@
 """Add pre_alert_sent_at to incidents_detection
 
 Revision ID: c3d4e5f6a7b8
-Revises: 919f5a9d12b7
+Revises: a9ff15ba0f87
 Create Date: 2026-03-01 17:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'c3d4e5f6a7b8'
-down_revision = '919f5a9d12b7'
+down_revision = 'a9ff15ba0f87'
 branch_labels = None
 depends_on = None
 
