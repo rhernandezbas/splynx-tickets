@@ -23,7 +23,9 @@ Feature: Ciclo de vida de tickets
   @changed:2026-03-01
   @reason:Nuevo escenario que reemplaza la descarga por Selenium
   Scenario: Recepción de tickets por webhook
-    Given Gestión Real envía un POST a /api/hooks/nuevo-ticket
+    Given Suricata envía un POST a /api/hooks/nuevo-ticket
+    And el payload contiene campos con nombres con espacios (ej: "Numero de ticket")
+    And el endpoint normaliza los campos a snake_case antes de guardar
     And el payload contiene numero_ticket (numérico) y numero_cliente (requerido)
     When el endpoint recibe el webhook
     Then se guarda el registro en la tabla hook_nuevo_ticket con processed = False
@@ -35,7 +37,9 @@ Feature: Ciclo de vida de tickets
   Scenario: Procesamiento de webhooks pendientes
     Given existen registros en hook_nuevo_ticket con processed = False
     When se ejecuta el job process_webhooks cada 3 minutos
-    Then se mapean los campos del webhook a tickets_detection
+    Then solo se procesan webhooks con motivo_contacto = "General Soporte"
+    And los webhooks de otros motivos se marcan como processed sin crear ticket
+    And se mapean los campos del webhook a tickets_detection
     And se crea un registro con Estado = PENDING e is_created_splynx = False
     And se marca el webhook como processed = True con timestamp
     And los webhooks duplicados se marcan como procesados sin crear nuevo registro
@@ -143,7 +147,7 @@ Feature: Ciclo de vida de tickets
   @status:implemented
   @changed:2026-03-01
   Scenario: Webhook de cierre de ticket (auditoría)
-    Given Gestión Real envía un POST a /api/hooks/cierre-ticket
+    Given Suricata envía un POST a /api/hooks/cierre-ticket
     When el endpoint recibe el webhook de cierre
     Then se guarda el registro en la tabla hook_cierre_ticket
     And no se cierra el ticket automáticamente en el sistema

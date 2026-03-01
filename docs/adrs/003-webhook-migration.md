@@ -12,7 +12,7 @@ El sistema originalmente usaba **Selenium + Chromium** para hacer scraping de CS
 - **Latencia**: Polling cada 3 minutos implica hasta 3 minutos de retraso. El proceso de login + navegación + descarga agrega más tiempo.
 - **Mantenibilidad**: Selenium requiere ChromeDriver compatible, configuración headless, y manejo de timeouts y errores del navegador.
 
-Gestión Real ahora soporta webhooks salientes que envían un payload HTTP cuando se crea o cierra un ticket.
+Suricata (sistema intermedio de gestión de tickets) ahora envía webhooks HTTP cuando se crea o cierra un ticket.
 
 ## Decision
 
@@ -21,11 +21,31 @@ Reemplazar el pipeline **Selenium → CSV → DB** con un flujo **Webhook → DB
 ### Arquitectura del nuevo flujo
 
 ```
-Gestión Real → POST /api/hooks/nuevo-ticket → hook_nuevo_ticket (BD)
+Suricata → POST /api/hooks/nuevo-ticket → hook_nuevo_ticket (BD)
   → [Scheduler cada 3 min] → process_pending_webhooks()
+  → Solo motivo "General Soporte" se procesa
   → tickets_detection (BD) → create_ticket() en Splynx
   → Asignación + Notificación WhatsApp
 ```
+
+### Normalización de campos
+
+Suricata envía campos con nombres con espacios. El endpoint normaliza a snake_case antes de guardar:
+
+| Campo Suricata | Campo modelo |
+|---|---|
+| `Nombre de la empresa` | `nombre_empresa` |
+| `Numero de ticket` | `numero_ticket` |
+| `Numero de  cliente` | `numero_cliente` |
+| `Numero de  Whatsapp` | `numero_whatsapp` |
+| `Motivo de contacto` | `motivo_contacto` |
+| `Departamento creacion del ticket` | `departamento` |
+| `Canal por el que entro el ticket` | `canal_entrada` |
+| `Nombre y apellido del usuario` | `nombre_usuario` |
+
+### Filtro por motivo de contacto
+
+El webhook recibe tickets de todas las áreas, pero solo los de **"General Soporte"** se procesan para crear en Splynx. Los demás se guardan en `hook_nuevo_ticket` como auditoría pero se marcan como `processed=True` sin crear ticket. El motivo es configurable via `ConfigHelper` con la clave `WEBHOOK_MOTIVO_PERMITIDO`.
 
 ### Componentes
 
@@ -78,6 +98,6 @@ El webhook solo guarda en BD y responde inmediatamente. Un job del scheduler pro
 - **Datos más ricos**: El webhook trae `motivo_contacto`, `canal_entrada`, `numero_whatsapp` directamente
 
 ### Negative
-- **Dependencia del webhook de Gestión Real**: Si GR no envía el webhook, no se crea el ticket
+- **Dependencia del webhook de Suricata**: Si Suricata no envía el webhook, no se crea el ticket
 - **Sin autenticación en webhooks**: Actualmente los endpoints no validan el origen (decisión consciente, a mejorar)
 - **Webhook de cierre es solo auditoría**: No auto-cierra tickets; la sincronización con Splynx sigue siendo la fuente de verdad para cierres

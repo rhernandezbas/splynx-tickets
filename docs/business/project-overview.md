@@ -2,12 +2,13 @@
 
 ## Descripción
 
-App Splynx es un sistema automatizado de gestión de tickets que integra dos plataformas:
+App Splynx es un sistema automatizado de gestión de tickets que integra tres plataformas:
 
-- **Splynx**: Plataforma de gestión ISP (Internet Service Provider)
-- **Gestión Real**: Sistema de ticketing externo
+- **Suricata**: Sistema intermedio de gestión de tickets que envía webhooks al backend
+- **Splynx**: Plataforma de gestión ISP donde se crean y gestionan los tickets
+- **Evolution API**: Servicio de notificaciones WhatsApp
 
-El sistema automatiza el ciclo completo: descarga de tickets, creación en Splynx, asignación justa a operadores, notificaciones por WhatsApp y seguimiento de tiempos de respuesta.
+El sistema automatiza el ciclo completo: recepción de tickets por webhook desde Suricata, creación en Splynx, asignación justa a operadores, notificaciones por WhatsApp y seguimiento de tiempos de respuesta.
 
 ## Problema que Resuelve
 
@@ -33,9 +34,9 @@ Antes de App Splynx, los operadores debían:
 ## Flujo Principal de Negocio
 
 ```
-Gestión Real → [Webhook POST /api/hooks/nuevo-ticket] → hook_nuevo_ticket (BD)
-  → [Scheduler procesa webhooks cada 3 min] → tickets_detection (BD)
-  → [API Splynx crea tickets] → Splynx
+Suricata → [Webhook POST /api/hooks/nuevo-ticket] → hook_nuevo_ticket (BD)
+  → [Scheduler procesa webhooks cada 3 min] → Solo "General Soporte"
+  → tickets_detection (BD) → [API Splynx crea tickets] → Splynx
   → [Algoritmo asigna operador] → Operador notificado vía WhatsApp
   → [Monitoreo continuo] → Alertas de tickets vencidos
   → [Fin de turno] → Resumen y auto-desasignación
