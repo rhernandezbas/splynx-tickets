@@ -1,6 +1,5 @@
 """
 Webhook Processor - Processes pending webhook records into tickets.
-Replaces the old Selenium CSV download pipeline.
 """
 
 from app.interface.webhook_interface import HookNuevoTicketInterface

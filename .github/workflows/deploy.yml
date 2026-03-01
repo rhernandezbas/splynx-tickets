@@ -57,6 +57,10 @@ jobs:
             exit 1
           fi
 
+          # Ejecutar migraciones de BD
+          echo "🔄 Ejecutando migraciones de base de datos..."
+          docker compose exec -T backend flask db upgrade 2>&1 || echo "⚠️ Migraciones fallaron o no hay pendientes"
+
           # Verificar
           echo "⏳ Esperando que el servicio esté listo..."
           sleep 20

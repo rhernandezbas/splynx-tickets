@@ -9,7 +9,7 @@ from app.utils.config import db
 from app.models.models import IncidentsDetection
 from app.services.splynx_services_singleton import SplynxServicesSingleton
 from app.utils.config_helper import ConfigHelper
-from app.utils.date_utils import parse_gestion_real_date, parse_splynx_date, ensure_argentina_tz
+from app.utils.date_utils import parse_ticket_date, parse_splynx_date, ensure_argentina_tz
 from app.utils.logger import get_logger
 from datetime import datetime
 import pytz
@@ -79,7 +79,7 @@ def sync_tickets_status():
 
                     # Si no hay last_update aún, usar fecha de creación como fallback
                     if not last_update:
-                        last_update = parse_gestion_real_date(ticket.Fecha_Creacion)
+                        last_update = parse_ticket_date(ticket.Fecha_Creacion)
                         if last_update and not ticket.last_update:
                             ticket.last_update = last_update
                             logger.debug(f"*** Ticket {ticket_id}: Fallback a Fecha_Creacion: {last_update}")
@@ -121,7 +121,7 @@ def sync_tickets_status():
 
                         # Calcular tiempo total de resolución (creación → cierre)
                         if ticket.closed_at and ticket.Fecha_Creacion:
-                            created_at = parse_gestion_real_date(ticket.Fecha_Creacion)
+                            created_at = parse_ticket_date(ticket.Fecha_Creacion)
                             if created_at:
                                 # Asegurar que closed_at tenga timezone Argentina
                                 closed_at_tz = ensure_argentina_tz(ticket.closed_at)

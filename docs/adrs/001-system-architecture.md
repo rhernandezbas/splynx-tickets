@@ -5,7 +5,7 @@ Accepted
 
 ## Context
 
-Se necesita un sistema automatizado de gestión de tickets que integre Splynx (plataforma ISP) con Gestión Real (sistema de ticketing). El sistema debe asignar tickets automáticamente a operadores usando algoritmos de distribución justa, enviar notificaciones por WhatsApp y rastrear tiempos de respuesta.
+Se necesita un sistema automatizado de gestión de tickets que integre Splynx (plataforma ISP) con Suricata (sistema de ticketing). El sistema debe asignar tickets automáticamente a operadores usando algoritmos de distribución justa, enviar notificaciones por WhatsApp y rastrear tiempos de respuesta.
 
 ## Decision
 
@@ -13,10 +13,10 @@ Se necesita un sistema automatizado de gestión de tickets que integre Splynx (p
 - **Backend**: Flask (Python 3.10+) con SQLAlchemy ORM
 - **Base de datos**: MySQL remota (190.7.234.37:3025)
 - **Scheduler**: APScheduler para jobs periódicos
-- **Ingesta de tickets**: Webhooks desde Gestión Real (ver ADR-003)
+- **Ingesta de tickets**: Webhooks desde Suricata (ver ADR-003)
 - **Notificaciones**: Evolution API para WhatsApp
 - **Deployment**: Docker Compose con builds multi-stage
-- **CI/CD**: GitHub Actions → SSH deploy a VPS
+- **CI/CD**: GitHub Actions con self-hosted runner en VPS
 
 ### Arquitectura por Capas
 
@@ -49,7 +49,7 @@ Las operaciones de larga duración se ejecutan en threads de background:
 | Sistema | Método | Propósito |
 |---------|--------|-----------|
 | Splynx | REST API | Crear/cerrar tickets, obtener clientes |
-| Gestión Real | Webhooks entrantes | Recibir tickets nuevos y cierres (ver ADR-003) |
+| Suricata | Webhooks entrantes | Recibir tickets nuevos y cierres (ver ADR-003) |
 | Evolution API | REST API | Notificaciones WhatsApp |
 
 ### Timezone
@@ -65,7 +65,7 @@ Todo el sistema opera en `America/Argentina/Buenos_Aires`.
 - Configuración dinámica desde base de datos sin redeploy
 
 ### Negative
-- Dependencia de webhooks de Gestión Real (si GR no envía, no se crea el ticket)
+- Dependencia de webhooks de Suricata (si Suricata no envía, no se crea el ticket)
 - Threads manuales en lugar de task queue (Celery)
 - Base de datos remota introduce latencia
 

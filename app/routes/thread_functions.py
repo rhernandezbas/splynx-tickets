@@ -31,8 +31,7 @@ def get_splynx_service():
 
 def thread_process_webhooks(app):
     """
-    Procesa webhooks pendientes y luego crea tickets en Splynx.
-    Reemplaza el viejo flujo Selenium -> CSV -> BD.
+    Procesa webhooks pendientes y crea tickets en Splynx.
     """
     with app.app_context():
         from app.services.webhook_processor import process_pending_webhooks

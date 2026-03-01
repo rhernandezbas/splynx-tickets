@@ -27,7 +27,7 @@ summary: "Reglas de implementación para rutas, servicios, interfaces y patrones
   hilo = threading.Thread(target=func, args=(app,))
   hilo.start()
   ```
-- NUNCA ejecutar operaciones de Selenium o llamadas API externas en el thread principal
+- NUNCA ejecutar llamadas API externas en el thread principal
 
 ## Capa de interfaz (repositorio)
 - Todas las operaciones CRUD pasan por `app/interface/`

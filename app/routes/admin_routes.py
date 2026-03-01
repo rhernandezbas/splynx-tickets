@@ -843,10 +843,10 @@ def get_operator_metrics(person_id):
         ).all()
 
         # Filter by date range using last_update or parsed Fecha_Creacion
-        from app.utils.date_utils import parse_gestion_real_date
+        from app.utils.date_utils import parse_ticket_date
         metrics = []
         for ticket in all_operator_tickets:
-            ticket_date = ticket.last_update or parse_gestion_real_date(ticket.Fecha_Creacion)
+            ticket_date = ticket.last_update or parse_ticket_date(ticket.Fecha_Creacion)
             if ticket_date and ticket_date >= start_date.replace(tzinfo=None):
                 metrics.append(ticket)
 
@@ -865,7 +865,7 @@ def get_operator_metrics(person_id):
         daily_stats = {}
         for metric in metrics:
             # Use last_update or parsed Fecha_Creacion for daily grouping
-            metric_date = metric.last_update or parse_gestion_real_date(metric.Fecha_Creacion)
+            metric_date = metric.last_update or parse_ticket_date(metric.Fecha_Creacion)
             if not metric_date:
                 continue
             date_key = metric_date.strftime('%Y-%m-%d')

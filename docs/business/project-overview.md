@@ -13,7 +13,7 @@ El sistema automatiza el ciclo completo: recepción de tickets por webhook desde
 ## Problema que Resuelve
 
 Antes de App Splynx, los operadores debían:
-1. Revisar manualmente Gestión Real para nuevos tickets
+1. Revisar manualmente el sistema de tickets para nuevos casos
 2. Crear tickets manualmente en Splynx
 3. Coordinar entre ellos quién toma cada ticket
 4. No había visibilidad de tickets vencidos o sin atender

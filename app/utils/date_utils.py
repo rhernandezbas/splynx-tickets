@@ -12,9 +12,9 @@ logger = get_logger(__name__)
 ARGENTINA_TZ = pytz.timezone('America/Argentina/Buenos_Aires')
 
 
-def parse_gestion_real_date(date_str: str) -> Optional[datetime]:
+def parse_ticket_date(date_str: str) -> Optional[datetime]:
     """
-    Parse date from Gestión Real CSV format: DD-MM-YYYY HH:MM:SS
+    Parse date in DD-MM-YYYY HH:MM:SS format.
 
     Args:
         date_str: Date string in DD-MM-YYYY HH:MM:SS format
@@ -23,9 +23,9 @@ def parse_gestion_real_date(date_str: str) -> Optional[datetime]:
         datetime object or None if parsing fails
 
     Examples:
-        >>> parse_gestion_real_date("29-01-2026 23:11:30")
+        >>> parse_ticket_date("29-01-2026 23:11:30")
         datetime(2026, 1, 29, 23, 11, 30)
-        >>> parse_gestion_real_date("invalid")
+        >>> parse_ticket_date("invalid")
         None
     """
     if not date_str or not isinstance(date_str, str):
@@ -58,8 +58,12 @@ def parse_gestion_real_date(date_str: str) -> Optional[datetime]:
         return parsed_date
 
     except (ValueError, IndexError) as e:
-        logger.warning(f"Error parsing Gestión Real date '{date_str}': {e}")
+        logger.warning(f"Error parsing ticket date '{date_str}': {e}")
         return None
+
+
+# Backward-compatible alias (used by migrations — do not remove)
+parse_gestion_real_date = parse_ticket_date
 
 
 def parse_splynx_date(date_str: str) -> Optional[datetime]:

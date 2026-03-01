@@ -19,7 +19,7 @@ When multiple independent tasks need to be done, launch agents in parallel to ma
 
 ## Project Overview
 
-App Splynx is an automated ticket management system that integrates with Splynx ISP management platform and Gestión Real ticketing system. The system automatically assigns tickets to operators using fair distribution algorithms, sends WhatsApp notifications, and tracks response times.
+App Splynx is an automated ticket management system that integrates with Splynx ISP management platform and Suricata ticket management system. The system automatically assigns tickets to operators using fair distribution algorithms, sends WhatsApp notifications, and tracks response times.
 
 ## Architecture
 
@@ -27,7 +27,7 @@ App Splynx is an automated ticket management system that integrates with Splynx 
 - **Backend**: Flask (Python 3.10+) with SQLAlchemy ORM
 - **Database**: MySQL (remote, hosted at 190.7.234.37:3025)
 - **Task Scheduling**: APScheduler for periodic jobs
-- **Ticket Ingestion**: Webhooks from Gestión Real (see ADR-003)
+- **Ticket Ingestion**: Webhooks from Suricata (see ADR-003)
 - **Notifications**: Evolution API for WhatsApp integration
 - **Deployment**: Docker Compose with multi-stage builds
 
@@ -55,7 +55,7 @@ App Splynx is an automated ticket management system that integrates with Splynx 
 
 #### 3. Services Layer (`app/services/`)
 - **splynx_services.py**: API integration with Splynx (tickets, customers)
-- **webhook_processor.py**: Processes pending webhooks from Gestión Real into tickets
+- **webhook_processor.py**: Processes pending webhooks from Suricata into tickets
 - **ticket_manager.py**: Business logic for ticket assignment and management
 - **evolution_api.py**: WhatsApp API integration
 - **whatsapp_service.py**: WhatsApp message formatting and delivery
@@ -315,7 +315,7 @@ Long-running operations use background threads:
 
 ## Webhook Configuration
 
-Tickets are received via incoming webhooks from Gestión Real:
+Tickets are received via incoming webhooks from Suricata:
 - `POST /api/hooks/nuevo-ticket` - Receives new ticket payloads, validates `numero_ticket` and `numero_cliente`
 - `POST /api/hooks/cierre-ticket` - Receives ticket closure payloads (audit only)
 - Webhooks are stored in `hook_nuevo_ticket` / `hook_cierre_ticket` tables
@@ -384,4 +384,4 @@ Application runs on **port 7842** (both locally and in production).
 - Check `hook_nuevo_ticket` table for records with `processed=False`
 - Verify the `process_webhooks_job` is running in the scheduler
 - Check logs for errors in `webhook_processor.py`
-- Verify `POST /api/hooks/nuevo-ticket` is receiving payloads from Gestión Real
+- Verify `POST /api/hooks/nuevo-ticket` is receiving payloads from Suricata

@@ -74,10 +74,6 @@ Thumbs.db
 app/archivos/*.csv
 app/archivos/
 
-# Selenium
-geckodriver.log
-chromedriver.log
-
 # Flask
 instance/
 .webassets-cache
