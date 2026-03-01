@@ -526,8 +526,26 @@ class TicketManager:
                             continue
 
                     # Verificar si el operador está en su horario de alertas
-                    if not ScheduleHelper.is_operator_available(assigned_to, schedule_type='alert', current_time=now):
-                        logger.info(f"⏰ Operador {assigned_to} fuera de horario de alertas - Ticket {ticket_id} omitido")
+                    # En fin de semana, usar lógica de guardia (misma que asignación)
+                    is_weekend = now.weekday() >= 5
+                    operator_in_alert_schedule = False
+
+                    if is_weekend:
+                        PERSONA_GUARDIA_FINDE = ConfigHelper.get_int('PERSONA_GUARDIA_FINDE', 10)
+                        FINDE_HORA_INICIO = ConfigHelper.get_int('FINDE_HORA_INICIO', 9)
+                        FINDE_HORA_FIN = ConfigHelper.get_int('FINDE_HORA_FIN', 21)
+
+                        if assigned_to == PERSONA_GUARDIA_FINDE and FINDE_HORA_INICIO <= now.hour < FINDE_HORA_FIN:
+                            operator_in_alert_schedule = True
+                            logger.info(f"📅 Fin de semana - Operador de guardia {assigned_to} en horario ({now.hour}:{now.minute:02d})")
+                        else:
+                            logger.info(f"⏰ Fin de semana - Ticket {ticket_id} asignado a {assigned_to} (guardia: {PERSONA_GUARDIA_FINDE}) - omitido")
+                    else:
+                        operator_in_alert_schedule = ScheduleHelper.is_operator_available(assigned_to, schedule_type='alert', current_time=now)
+
+                    if not operator_in_alert_schedule:
+                        if not is_weekend:
+                            logger.info(f"⏰ Operador {assigned_to} fuera de horario de alertas - Ticket {ticket_id} omitido")
                         continue
 
                     # Buscar ticket local para anti-spam
