@@ -35,6 +35,23 @@ summary: "Reglas técnicas del algoritmo de distribución justa de tickets entre
 - `last_assigned` se actualiza en cada asignación
 - NUNCA resetear contadores manualmente sin razón operativa
 
+## Reset automático de contadores por turno
+- **Problema resuelto**: Operadores que entran en turnos posteriores tenían contador=0 mientras los demás acumulaban 15+, recibiendo TODOS los tickets nuevos hasta emparejarse
+- **Solución**: Job `reset_assignment_counters_job` que resetea todos los contadores a 0 al inicio de cada turno
+- **Configuración**: `ASSIGNMENT_RESET_HOURS` en `system_config` (string CSV, default `"8,16"`)
+  - Ejemplo: `"8,16"` → reset a las 8:00 AM y 4:00 PM
+  - Configurable vía `POST /api/admin/config`
+- **Mecánica del job**:
+  - Se ejecuta cada 1 minuto vía APScheduler
+  - Verifica si `hora_actual` está en la lista de horas de reset Y `minuto <= 2` (ventana de ±2 min)
+  - Llama a `AssignmentTrackerInterface.reset_all_counts()` para poner todos los `ticket_count` a 0
+  - Usa timezone `America/Argentina/Buenos_Aires`
+- **Reglas**:
+  - El reset es global: afecta a TODOS los operadores en `assignment_tracker`
+  - No depende de horario laboral (se ejecuta siempre, la verificación de hora es suficiente)
+  - Si `ASSIGNMENT_RESET_HOURS` tiene valor inválido, usa fallback `[8, 16]`
+  - El job NO resetea `last_assigned`, solo `ticket_count`
+
 ## Horarios de asignación
 - Consultar `operator_schedule` con `schedule_type='assignment'`
 - Formato de hora: HH:MM (24 horas)
