@@ -25,7 +25,6 @@ def create_app() -> Flask:
     from app.routes.device_analysis_routes import device_analysis_bp
     from app.routes.whatsapp_routes import whatsapp_bp
     from app.routes.hooks_routes import hooks_bp
-    from app.routes.splynx_webhooks import splynx_webhooks_bp
     app.register_blueprint(routes_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(messages_bp)
@@ -34,7 +33,6 @@ def create_app() -> Flask:
     app.register_blueprint(device_analysis_bp)
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(hooks_bp)
-    app.register_blueprint(splynx_webhooks_bp)
     logger.info("✅ Blueprints registrados correctamente")
     
     # Inicializar scheduler inmediatamente al crear la app
