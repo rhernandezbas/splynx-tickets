@@ -19,8 +19,8 @@ jobs:
         with:
           host: 190.7.234.37
           username: root
-          password: YmUeXJYrO3
-          port: 22
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 2222
           command_timeout: 30m
           script: |
             echo "🔧 Verificando dependencias..."
@@ -130,8 +130,8 @@ jobs:
         with:
           host: 190.7.234.37
           username: root
-          password: YmUeXJYrO3
-          port: 22
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 2222
           script: |
             cd /opt/splynx-tickets
             

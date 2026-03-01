@@ -16,6 +16,8 @@ hooks_bp = Blueprint('hooks', __name__, url_prefix='/api/hooks')
 def nuevo_ticket():
     """Recibe payload de nuevo ticket y lo guarda en BD."""
     data = request.get_json(silent=True)
+    logger.debug(f"[WEBHOOK nuevo-ticket] Headers: {dict(request.headers)}")
+    logger.debug(f"[WEBHOOK nuevo-ticket] Payload: {data}")
     if data is None:
         return jsonify({'error': 'Body JSON requerido'}), 400
 
@@ -43,6 +45,8 @@ def nuevo_ticket():
 def cierre_ticket():
     """Recibe payload de cierre de ticket y lo guarda en BD."""
     data = request.get_json(silent=True)
+    logger.debug(f"[WEBHOOK cierre-ticket] Headers: {dict(request.headers)}")
+    logger.debug(f"[WEBHOOK cierre-ticket] Payload: {data}")
     if data is None:
         return jsonify({'error': 'Body JSON requerido'}), 400
 
