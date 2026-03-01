@@ -65,7 +65,7 @@ class HookNuevoTicketInterface:
             if not record:
                 return False
             record.processed = True
-            record.processed_at = datetime.utcnow()
+            record.processed_at = datetime.now()
             db.session.commit()
             return True
         except SQLAlchemyError as e:

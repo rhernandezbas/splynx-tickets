@@ -3,7 +3,7 @@
 import threading
 from flask import jsonify, current_app
 from app.routes import blueprint
-from app.routes.thread_functions import thread_process_webhooks, thread_close_tickets, thread_create_tickets, thread_assign_unassigned_tickets, thread_alert_overdue_tickets, thread_end_of_shift_notifications, thread_auto_unassign_after_shift
+from app.routes.thread_functions import thread_process_webhooks, thread_create_tickets, thread_assign_unassigned_tickets, thread_alert_overdue_tickets, thread_end_of_shift_notifications, thread_auto_unassign_after_shift
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,17 +17,6 @@ def health_check():
         "status": "healthy",
         "service": "splynx-tickets",
         "message": "Application is running"
-    }), 200
-
-
-@blueprint.route("/api/tickets/close", methods=["POST"])
-def close_tickets():
-    """"""
-    hilo = threading.Thread(target=thread_close_tickets)
-    hilo.start()
-    return jsonify({
-        "success": True,
-        "message": "Tickets cerrados eliminados"
     }), 200
 
 
@@ -201,7 +190,6 @@ def sync_tickets_status_endpoint():
     """Sincroniza el estado de tickets abiertos con Splynx"""
     try:
         from app.utils.sync_tickets_status import sync_tickets_status
-        from app import create_app
         
         app = current_app._get_current_object()
         

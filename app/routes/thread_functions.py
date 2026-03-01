@@ -49,18 +49,6 @@ def thread_process_webhooks(app):
             return False
 
 
-def thread_close_tickets():
-    """
-    Versión para hilos de close_tickets.
-    Limpia tickets cerrados de la BD.
-    """
-    sp = get_splynx_service()
-    tk = TicketManager(sp)
-    data = tk.clean_closed_ticket()
-    logger.info("✅ Tickets cerrados eliminados")
-    return data
-
-
 def thread_create_tickets(app):
     """
     Versión para hilos de create_tickets.
