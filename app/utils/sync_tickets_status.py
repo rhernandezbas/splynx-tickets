@@ -110,7 +110,7 @@ def sync_tickets_status():
                                     person_id=new_assigned_to,
                                     ticket_id=ticket_id,
                                     subject=ticket.Asunto or 'Sin asunto',
-                                    customer_name=ticket.Nombre_Cliente or 'Cliente desconocido',
+                                    customer_name=ticket.Cliente_Nombre or 'Cliente desconocido',
                                     priority=ticket.Prioridad or 'medium'
                                 )
                                 if notif_resultado["success"]:
