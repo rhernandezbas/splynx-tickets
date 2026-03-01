@@ -85,7 +85,7 @@ class EvolutionAPIService:
 🕐 *Creado:* {created_at}
 ⏱️ *Tiempo transcurrido:* {minutes_elapsed} minutos
 
-⚠️ Este ticket lleva más de 45 minutos asignado sin respuesta.
+⚠️ Este ticket lleva más de 60 minutos asignado sin respuesta.
 Por favor, revisa y actualiza el estado del ticket."""
         
         return self.send_text_message(phone_number, message)
@@ -112,7 +112,7 @@ Por favor, revisa y actualiza el estado del ticket."""
         
         message = f"""🚨 *ALERTA DE TICKETS VENCIDOS*
 
-{greeting}Tienes *{total_tickets}* ticket{'s' if total_tickets > 1 else ''} con más de 45 minutos sin respuesta:
+{greeting}Tienes *{total_tickets}* ticket{'s' if total_tickets > 1 else ''} con más de 60 minutos sin respuesta:
 
 """
         

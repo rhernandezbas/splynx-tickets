@@ -87,7 +87,7 @@ Tienes *N* ticket(s) que vencerán en ~{minutos} minutos:
 
 Hola *{nombre}*,
 
-Tienes *N* ticket(s) con más de 45 minutos sin respuesta:
+Tienes *N* ticket(s) con más de 60 minutos sin respuesta:
 ...
 ```
 
