@@ -3,6 +3,8 @@
 ## VPS Connection Details
 - **Host**: 190.7.234.37
 - **User**: root
+- **SSH Port**: 2222 (NOT default 22 - port 22 times out)
+- **SSH Command**: `ssh -p 2222 root@190.7.234.37`
 - **Application Path**: /opt/splynx-tickets
 - **Container Name**: splynx-backend
 - **Application Port**: 5605 (mapped from internal 7842)
@@ -21,7 +23,7 @@
 - **Execute Commands**: `docker exec splynx-backend <command>`
 
 ## Migration Process
-1. SSH to VPS: `ssh root@190.7.234.37`
+1. SSH to VPS: `ssh -p 2222 root@190.7.234.37`
 2. Navigate to app: `cd /opt/splynx-tickets`
 3. Pull changes: `git pull`
 4. Rebuild containers: `docker compose up -d --build`
@@ -45,7 +47,21 @@
 - **Test**: `curl http://localhost:5605/`
 - **Expected**: `{"message":"Application is running","service":"splynx-tickets","status":"healthy"}`
 
+## Common Issues (continued)
+
+### MySQL 1412 Error on Cold Start After Migration
+- **Symptom**: `(1412, 'Table definition has changed, please retry transaction')` in scheduler logs at startup
+- **Cause**: Scheduler fires initial job within seconds of container start, while MySQL still has stale table definition cache from the just-applied migration DDL
+- **Severity**: Benign/transient. Recovers automatically on next scheduler cycle (3 min)
+- **No action needed**: Not a persistent error; only appears in the first job run after a schema migration
+
 ## Recent Deployments
+
+### 2026-03-01: pre_alert_sent_at Migration
+- **Migration**: `c3d4e5f6a7b8` (head)
+- **Changes**: Added `pre_alert_sent_at` column to `tickets_detection` table
+- **Status**: Successful
+- **Note**: Transient MySQL 1412 error at startup (benign race condition, resolved in next cycle)
 
 ### 2026-02-08: NOC Permissions Migration
 - **Migration**: `a8c2d4e6f0b1_add_noc_permissions_to_users.py`

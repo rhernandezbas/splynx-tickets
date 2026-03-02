@@ -51,10 +51,22 @@ def check_and_reopen_tickets():
                     logger.debug(f"⏳ Ticket {ticket.Ticket_ID}: {elapsed:.1f} min en ventana ({window_minutes} min requeridos)")
                     continue
 
+                # Safety net: Si el ticket no tiene numero_ticket_gr (no vino de GR),
+                # no aplica reapertura → cerrar normalmente
+                if not ticket.numero_ticket_gr:
+                    ticket.is_closed = True
+                    ticket.closed_at = datetime.now()
+                    ticket.splynx_closed_at = None
+
+                    if ticket.Estado not in ('SUCCESS', 'CLOSED'):
+                        ticket.Estado = 'CLOSED'
+
+                    closed_count += 1
+                    logger.info(f"✅ Ticket {ticket.Ticket_ID} cerrado normalmente (sin numero_ticket_gr, reapertura no aplica)")
+                    continue
+
                 # Ventana expirada - verificar si hay cierre de GR
-                gr_closure = None
-                if ticket.numero_ticket_gr:
-                    gr_closure = HookCierreTicketInterface.find_by_numero_ticket(ticket.numero_ticket_gr)
+                gr_closure = HookCierreTicketInterface.find_by_numero_ticket(ticket.numero_ticket_gr)
 
                 if gr_closure:
                     # Caso 2: Cierre de GR llegó durante la ventana → cerrar normalmente

@@ -10,10 +10,20 @@ summary: "Reglas técnicas para la reapertura automática de tickets cuando se c
 ## Problema
 Los operadores a veces cierran tickets en Splynx pero olvidan cerrarlos en GR (Gestión Real). Esto deja el ticket en un estado inconsistente — cerrado en Splynx pero abierto en GR.
 
+## Precondición: solo tickets de GR
+- La reapertura SOLO aplica a tickets que vinieron de Gestión Real (`numero_ticket_gr IS NOT NULL`)
+- Tickets creados manualmente en Splynx (sin `numero_ticket_gr`) se cierran directamente sin ventana de espera
+- Tanto `sync_tickets_status` como `ticket_reopen_checker` verifican esta condición antes de aplicar la lógica de reapertura
+
 ## Ventana de reapertura
-- Cuando `sync_tickets_status` detecta un ticket cerrado en Splynx (`closed='1'`), NO se cierra inmediatamente
+- Cuando `sync_tickets_status` detecta un ticket cerrado en Splynx (`closed='1'`) Y tiene `numero_ticket_gr`, NO se cierra inmediatamente
 - Se marca `splynx_closed_at = now()` para iniciar una ventana de espera
 - La ventana es configurable: `TICKET_REOPEN_WINDOW_MINUTES` en `system_config` (default: 7 minutos)
+
+## Caso 0: Ticket sin GR (creado manualmente en Splynx)
+- `sync_tickets_status` detecta cierre en Splynx
+- Verifica que `numero_ticket_gr` es NULL → cierra directamente sin ventana
+- `ticket_reopen_checker` tiene safety net: si un ticket en ventana no tiene `numero_ticket_gr`, lo cierra en vez de reabrir
 
 ## Caso 1: Cierra Splynx, NO cierra GR
 - `sync_tickets_status` detecta cierre en Splynx → marca `splynx_closed_at = now()`
@@ -43,7 +53,8 @@ Los operadores a veces cierran tickets en Splynx pero olvidan cerrarlos en GR (G
 - Se ejecuta cada 2 minutos vía APScheduler
 - Busca tickets con `splynx_closed_at IS NOT NULL` y `is_closed = False`
 - Para cada uno, verifica si la ventana expiró (`elapsed >= TICKET_REOPEN_WINDOW_MINUTES`)
-- Si expiró, busca cierre de GR en `hook_cierre_ticket` por `numero_ticket_gr`
+- Si `numero_ticket_gr` es NULL → cierra normalmente (safety net, no aplica reapertura)
+- Si expiró y tiene `numero_ticket_gr`, busca cierre de GR en `hook_cierre_ticket`
 - Si hay cierre GR → cierra normalmente
 - Si NO hay cierre GR → reabre en Splynx y notifica
 

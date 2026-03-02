@@ -229,11 +229,17 @@ def sync_tickets_status():
                     
                     # Si el ticket está cerrado en Splynx (closed = "1")
                     if is_closed:
+                        # Caso 0: Ticket sin numero_ticket_gr (no vino de GR) → cerrar directamente
+                        # La reapertura solo aplica a tickets que vinieron de GR
+                        if not ticket.numero_ticket_gr:
+                            _close_ticket_normally(ticket, ticket_id, updated_at, status_id)
+                            closed_count += 1
+                            logger.info(f"✅ Ticket {ticket_id} cerrado directamente (sin numero_ticket_gr, no aplica reapertura)")
+                            continue
+
                         # Caso 3: Verificar si ya existe cierre de GR antes de iniciar ventana
-                        gr_closure_exists = False
-                        if ticket.numero_ticket_gr:
-                            gr_closure = HookCierreTicketInterface.find_by_numero_ticket(ticket.numero_ticket_gr)
-                            gr_closure_exists = gr_closure is not None
+                        gr_closure = HookCierreTicketInterface.find_by_numero_ticket(ticket.numero_ticket_gr)
+                        gr_closure_exists = gr_closure is not None
 
                         if gr_closure_exists:
                             # Caso 3: GR cerró primero → cerrar directamente sin ventana
