@@ -158,22 +158,40 @@ def _cleanup_lock():
 def init_scheduler(app):
     """Inicializa el scheduler con la tarea programada"""
     global _scheduler_instance
-    
-    # Verificar si ya existe una instancia
+
+    # Verificar si ya existe una instancia viva en este proceso
     if _scheduler_instance is not None:
-        logger.warning("⚠️ Scheduler ya existe en este proceso, omitiendo...")
-        return _scheduler_instance
-    
+        from apscheduler.schedulers.base import STATE_RUNNING
+        if _scheduler_instance.state == STATE_RUNNING:
+            logger.warning("⚠️ Scheduler ya existe y está corriendo en este proceso, omitiendo...")
+            return _scheduler_instance
+        else:
+            logger.warning("⚠️ Scheduler instance existe pero no está corriendo (state=%s), reinicializando...", _scheduler_instance.state)
+            _scheduler_instance = None
+
     # Verificar lock file para evitar múltiples schedulers entre procesos
     if os.path.exists(_scheduler_lock_file):
         try:
             with open(_scheduler_lock_file, 'r') as f:
-                existing_pid = f.read().strip()
-            logger.warning(f"⚠️ Scheduler ya está corriendo en PID {existing_pid}, omitiendo...")
-            return None
-        except Exception as e:
-            logger.warning(f"⚠️ Error leyendo lock file: {e}")
-            # Continuar de todas formas
+                existing_pid = int(f.read().strip())
+
+            # Verificar si el proceso con ese PID realmente existe
+            try:
+                os.kill(existing_pid, 0)  # Señal 0: solo verifica existencia, no mata el proceso
+                # El proceso existe — si es otro proceso, respetar el lock
+                if existing_pid != os.getpid():
+                    logger.warning(f"⚠️ Scheduler ya está corriendo en PID {existing_pid}, omitiendo...")
+                    return None
+                # Si es nuestro propio PID pero la instancia murió, continuar
+                logger.warning(f"⚠️ Lock file apunta al PID actual ({existing_pid}) pero instancia no activa, reinicializando...")
+                _cleanup_lock()
+            except OSError:
+                # El proceso ya no existe — lock file es stale (ej: reinicio del VPS)
+                logger.warning(f"⚠️ Lock file stale detectado (PID {existing_pid} ya no existe), limpiando y reinicializando...")
+                _cleanup_lock()
+        except (ValueError, Exception) as e:
+            logger.warning(f"⚠️ Error leyendo lock file: {e}, limpiando...")
+            _cleanup_lock()
     
     # Crear lock file con el PID actual
     try:
